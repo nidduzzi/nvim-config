@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -105,7 +105,7 @@ vim.o.number = true
 -- vim.o.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
-vim.o.mouse = 'a'
+vim.o.mouse = 'nv'
 
 -- Don't show the mode, since it's already in the status line
 vim.o.showmode = false
@@ -165,6 +165,10 @@ vim.o.scrolloff = 10
 -- instead raise a dialog asking if you wish to save the current file(s)
 -- See `:help 'confirm'`
 vim.o.confirm = true
+
+if vim.o.shell ~= 'bash' then
+  vim.o.shellcmdflag = '-c'
+end
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -283,6 +287,9 @@ require('lazy').setup({
       },
     },
   },
+  {
+    'sindrets/diffview.nvim',
+  },
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -368,12 +375,13 @@ require('lazy').setup({
 
         -- `build` is used to run some command when the plugin is installed/updated.
         -- This is only run then, not every time Neovim starts up.
-        build = 'make',
+        -- build = 'make',
+        build = 'cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release',
 
         -- `cond` is a condition used to determine whether this plugin should be
         -- installed and loaded.
         cond = function()
-          return vim.fn.executable 'make' == 1
+          return vim.fn.executable 'cmake' == 1
         end,
       },
       { 'nvim-telescope/telescope-ui-select.nvim' },
@@ -492,6 +500,44 @@ require('lazy').setup({
       -- Allows extra capabilities provided by blink.cmp
       'saghen/blink.cmp',
     },
+    -- opts = function()
+    --   ---@class PluginLspOpts
+    --   local ret = {
+    --     -- LSP Server Settings
+    --     servers = {
+    --       ts_ls = {
+    --         mason = false,
+    --         settings = {
+    --           Typescript = {
+    --             workspace = {
+    --               checkThirdParty = false,
+    --             },
+    --           },
+    --         },
+    --       },
+    --       biome = { mason = false },
+    --     },
+    --   }
+    --   return ret
+    -- end,
+    --   'pmizio/typescript-tools.nvim',
+    --   dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    --   opts = {},
+    --   config = function()
+    --     require('typescript-tools').setup {
+    --       on_attach = function(client, bufnr)
+    --         client.server_capabilities.documentFormattingProvider = false
+    --         client.server_capabilities.documentRangeFormattingProvider = false
+    --       end,
+    --       settings = {
+    --         jsx_close_tag = {
+    --           enable = true,
+    --           filetypes = { 'javascriptreact', 'typescriptreact' },
+    --         },
+    --       },
+    --     }
+    --   end,
+    -- },
     config = function()
       -- Brief aside: **What is LSP?**
       --
@@ -674,6 +720,21 @@ require('lazy').setup({
         -- clangd = {},
         -- gopls = {},
         -- pyright = {},
+        -- ruff = {},
+        -- jedi_language_server = {},
+        pylsp = {
+          pylsp = {
+            plugins = {
+              ruff = {
+                enabled = true, -- Enable the plugin
+                formatEnabled = true, -- Enable formatting using ruffs formatter
+              },
+            },
+          },
+        },
+        -- mypy = {},
+        -- pylyzer = {},
+
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -681,8 +742,9 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
-        -- ts_ls = {},
         --
+        ts_ls = {},
+        biome = { formatEnabled = true },
 
         lua_ls = {
           -- cmd = { ... },
@@ -769,10 +831,13 @@ require('lazy').setup({
       formatters_by_ft = {
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
+        -- python = { 'ruff' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { 'biome', 'prettierd' },
+        javascriptreact = { 'biome', 'prettierd' },
+        typescript = { 'biome', 'prettierd' },
+        typescriptreact = { 'biome', 'prettierd' },
       },
     },
   },
@@ -835,8 +900,8 @@ require('lazy').setup({
         -- <c-k>: Toggle signature help
         --
         -- See :h blink-cmp-config-keymap for defining your own keymap
-        preset = 'default',
-
+        preset = 'super-tab',
+        ['<C-B>'] = { 'show', 'fallback' },
         -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
         --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
       },
@@ -850,7 +915,8 @@ require('lazy').setup({
       completion = {
         -- By default, you may press `<c-space>` to show the documentation.
         -- Optionally, set `auto_show = true` to show the documentation after a delay.
-        documentation = { auto_show = false, auto_show_delay_ms = 500 },
+        documentation = { auto_show = true, auto_show_delay_ms = 500 },
+        keyword = { range = 'prefix' },
       },
 
       sources = {
@@ -974,7 +1040,7 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
