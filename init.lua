@@ -115,7 +115,21 @@ vim.o.showmode = false
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
 vim.schedule(function()
-  vim.o.clipboard = 'unnamedplus'
+  -- vim.o.clipboard = 'unnamedplus'
+  local function paste()
+    return { vim.fn.split(vim.fn.getreg '', '\n'), vim.fn.getregtype '' }
+  end
+  vim.g.clipboard = {
+    name = 'OSC 52',
+    copy = {
+      ['+'] = require('vim.ui.clipboard.osc52').copy '+',
+      ['*'] = require('vim.ui.clipboard.osc52').copy '*',
+    },
+    paste = {
+      ['+'] = paste,
+      ['*'] = paste,
+    },
+  }
 end)
 
 -- Enable break indent
@@ -721,18 +735,17 @@ require('lazy').setup({
         -- gopls = {},
         -- pyright = {},
         -- ruff = {},
-        -- jedi_language_server = {},
-        pylsp = {
-          pylsp = {
-            plugins = {
-              ruff = {
-                enabled = true, -- Enable the plugin
-                formatEnabled = true, -- Enable formatting using ruffs formatter
-              },
-            },
-          },
-        },
-        -- mypy = {},
+        -- NOTE: Install ruff, mypy, and rope with PylspInstall
+        -- pylsp = {
+        --   pylsp = {
+        --     plugins = {
+        --       ruff = {
+        --         enabled = true, -- Enable the plugin
+        --         formatEnabled = true, -- Enable formatting using ruffs formatter
+        --       },
+        --     },
+        --   },
+        -- },
         -- pylyzer = {},
 
         -- rust_analyzer = {},
@@ -743,8 +756,8 @@ require('lazy').setup({
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         --
-        ts_ls = {},
-        biome = { formatEnabled = true },
+        -- ts_ls = {},
+        -- biome = { formatEnabled = true },
 
         lua_ls = {
           -- cmd = { ... },
