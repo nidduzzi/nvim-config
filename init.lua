@@ -1046,6 +1046,20 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
+  {
+    'chrisgrieser/nvim-origami',
+    event = 'VeryLazy',
+    opts = {
+      autoFold = { enabled = false },
+      foldKeymaps = { setup = false },
+    }, -- needed even when using default config
+
+    -- recommended: disable vim's auto-folding
+    init = function()
+      vim.opt.foldlevel = 99
+      vim.opt.foldlevelstart = 99
+    end,
+  },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
