@@ -518,44 +518,20 @@ require('lazy').setup({
       -- Allows extra capabilities provided by blink.cmp
       'saghen/blink.cmp',
     },
-    -- opts = function()
-    --   ---@class PluginLspOpts
-    --   local ret = {
-    --     -- LSP Server Settings
-    --     servers = {
-    --       ts_ls = {
-    --         mason = false,
-    --         settings = {
-    --           Typescript = {
-    --             workspace = {
-    --               checkThirdParty = false,
-    --             },
-    --           },
-    --         },
-    --       },
-    --       biome = { mason = false },
-    --     },
-    --   }
-    --   return ret
-    -- end,
-    --   'pmizio/typescript-tools.nvim',
-    --   dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-    --   opts = {},
-    --   config = function()
-    --     require('typescript-tools').setup {
-    --       on_attach = function(client, bufnr)
-    --         client.server_capabilities.documentFormattingProvider = false
-    --         client.server_capabilities.documentRangeFormattingProvider = false
-    --       end,
-    --       settings = {
-    --         jsx_close_tag = {
-    --           enable = true,
-    --           filetypes = { 'javascriptreact', 'typescriptreact' },
-    --         },
-    --       },
-    --     }
-    --   end,
-    -- },
+    opts = {
+      servers = {
+        pylsp = {
+          -- pylsp = {
+          plugins = {
+            ruff = {
+              enabled = true, -- Enable the plugin
+              formatEnabled = true, -- Enable formatting using ruffs formatter
+            },
+          },
+          -- },
+        },
+      },
+    },
     config = function()
       -- Brief aside: **What is LSP?**
       --
