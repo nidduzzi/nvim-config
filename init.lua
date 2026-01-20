@@ -115,21 +115,43 @@ vim.o.showmode = false
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
 vim.schedule(function()
-  -- vim.o.clipboard = 'unnamedplus'
-  local function paste()
-    return { vim.fn.split(vim.fn.getreg '', '\n'), vim.fn.getregtype '' }
+  local function is_ssh_forwarded_x11()
+    local display = os.getenv 'DISPLAY' or ''
+    local is_ssh = os.getenv 'SSH_CONNECTION' ~= nil
+
+    -- SSH -X/-Y typically sets DISPLAY to 'localhost:10.0' or '127.0.0.1:10.0'
+    -- The display number usually starts at 10 to avoid local conflicts.
+    local is_forwarded = display:match '^localhost:%d+'
+      or display:match '^127%.0%.0%.1:%d+'
+      or (display:match '^:%d+' and tonumber(display:match '^:(%d+)') >= 10)
+
+    return is_ssh and is_forwarded
   end
-  vim.g.clipboard = {
-    name = 'OSC 52',
-    copy = {
-      ['+'] = require('vim.ui.clipboard.osc52').copy '+',
-      ['*'] = require('vim.ui.clipboard.osc52').copy '*',
-    },
-    paste = {
-      ['+'] = paste,
-      ['*'] = paste,
-    },
-  }
+
+  local has_x11_tool = vim.fn.executable 'xclip' == 1 or vim.fn.executable 'xsel' == 1
+
+  -- Decide provider
+  if is_ssh_forwarded_x11() and has_x11_tool then
+    -- CASE 1: SSH X11 Tunnel is active.
+    -- We set nothing for vim.g.clipboard so Neovim uses the native X11 provider.
+    vim.opt.clipboard = 'unnamedplus'
+  else
+    -- CASE 2: Remote SSH but NO X11 Forwarding (or tools missing).
+    -- Force OSC 52 so it goes to the terminal emulator.
+    local function paste()
+      return { vim.fn.split(vim.fn.getreg '', '\n'), vim.fn.getregtype '' }
+    end
+
+    vim.g.clipboard = {
+      name = 'OSC 52',
+      copy = {
+        ['+'] = require('vim.ui.clipboard.osc52').copy '+',
+        ['*'] = require('vim.ui.clipboard.osc52').copy '*',
+      },
+      paste = { ['+'] = paste, ['*'] = paste },
+    }
+    vim.opt.clipboard = 'unnamedplus'
+  end
 end)
 
 -- Enable break indent
@@ -1000,7 +1022,7 @@ require('lazy').setup({
   { -- Highlight, edit, and navigate code
     'nvim-treesitter/nvim-treesitter',
     build = ':TSUpdate',
-    main = 'nvim-treesitter.configs', -- Sets main module to use for opts
+    -- main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
       ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
