@@ -85,6 +85,15 @@ return {
         desc = "Grep (docs only)",
       },
       {
+        -- Searching the editor itself, not the project. A feature used once a
+        -- month is otherwise a feature you have to remember a key for.
+        "<leader>sx",
+        function()
+          require("util.capabilities").open()
+        end,
+        desc = "Search what this editor can do",
+      },
+      {
         "<leader>sw",
         function()
           Snacks.picker.grep_word(search.opts("code"))

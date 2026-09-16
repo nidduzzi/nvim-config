@@ -69,13 +69,65 @@ return {
     opts = {},
   },
 
-  -- Side-by-side diffs and a readable file history.
+  -- Side-by-side diffs, file history, and the three-way view used to resolve
+  -- merge conflicts.
+  --
+  -- Each key toggles: press it to open the view, press the same key again to
+  -- close it. Diffview opens in a tab of its own, so without that you end up
+  -- hunting for :DiffviewClose or leaving stray tabs behind.
   {
     "sindrets/diffview.nvim",
-    cmd = { "DiffviewOpen", "DiffviewFileHistory" },
+    cmd = { "DiffviewOpen", "DiffviewFileHistory", "DiffviewClose" },
     keys = {
-      { "<leader>gd", "<cmd>DiffviewOpen<cr>", desc = "Diffview: open" },
-      { "<leader>gf", "<cmd>DiffviewFileHistory %<cr>", desc = "Diffview: file history" },
+      {
+        "<leader>gd",
+        function()
+          require("util.diff").toggle("DiffviewOpen")
+        end,
+        desc = "Diff: working tree (toggle)",
+      },
+      {
+        "<leader>gf",
+        function()
+          require("util.diff").toggle("DiffviewFileHistory %")
+        end,
+        desc = "Diff: history of this file (toggle)",
+      },
+      {
+        "<leader>gm",
+        function()
+          require("util.diff").toggle_merge()
+        end,
+        desc = "Diff: merge conflicts (toggle)",
+      },
+    },
+    opts = {
+      enhanced_diff_hl = true,
+      view = {
+        -- The three-way layout is what makes a conflict readable: your side,
+        -- the base it diverged from, and theirs, with the working copy below.
+        merge_tool = {
+          layout = "diff3_mixed",
+          disable_diagnostics = true,
+          winbar_info = true,
+        },
+      },
+      keymaps = {
+        view = {
+          { "n", "<leader>gd", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+          { "n", "<leader>gm", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+          { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+        },
+        file_panel = {
+          { "n", "<leader>gd", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+          { "n", "<leader>gm", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+          { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+        },
+        file_history_panel = {
+          { "n", "<leader>gf", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+          { "n", "q", "<cmd>DiffviewClose<cr>", { desc = "Close the diff" } },
+        },
+      },
     },
   },
 
