@@ -1,7 +1,7 @@
 -- LSP servers. Only the settings that differ from what the LazyVim language
 -- extras already configure.
 --
-Both pyrefly and python-lsp-server are in Mason's registry, but they are pip
+-- Both pyrefly and python-lsp-server are in Mason's registry, but they are pip
 -- packages, so Mason builds a virtual environment for them and that needs the
 -- venv module:
 --

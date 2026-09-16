@@ -29,7 +29,23 @@
 local M = {}
 
 --- Globs treated as documentation when no project overrides them.
-M.default_docs = { "openspec/**", "docs/**", "*.md", "*.mdx" }
+---
+--- Markdown alone is not enough. Checked against real repositories: in Flask,
+--- searching for "blueprint" hits 45 files, 17 of them in docs/ and written in
+--- reStructuredText, with a changelog in CHANGES.rst at the root. Excluding
+--- only docs/ and markdown leaves 28; adding the prose formats leaves 27 and
+--- no code.
+M.default_docs = {
+  "openspec/**",
+  "docs/**",
+  "*.md",
+  "*.mdx",
+  "*.rst",
+  "*.txt",
+  "*.adoc",
+  "CHANGELOG*",
+  "CHANGES*",
+}
 
 --- Read the project's overrides, if its `.nvim.lua` set any.
 ---@return { docs?: string[], presets?: table[] }
