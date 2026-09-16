@@ -1,30 +1,24 @@
--- LSP servers. Only the settings that differ from what the LazyVim language
--- extras already configure.
+-- Language servers.
 --
--- Both pyrefly and python-lsp-server are in Mason's registry, but they are pip
--- packages, so Mason builds a virtual environment for them and that needs the
--- venv module:
+-- Nothing here is installed automatically. A server attaches when the project
+-- provides it, from its own environment or from PATH, and is disabled quietly
+-- when nothing does. See lua/util/lsp.lua for how that is decided, and
+-- :checkhealth dotfiles for what it decided.
 --
---   The virtual environment was not created successfully because ensurepip is
---   not available. … apt install python3.12-venv
---
--- That cannot be fixed from inside the editor, and retrying it announces a
--- failure on every Python file. Python tools are installed with uv here, so
--- these servers are marked `mason = false` and the editor only reports what is
--- missing. See lua/util/tools.lua and :checkhealth dotfiles.
+-- The settings below therefore describe how a server should behave *if* it is
+-- present. Declaring one costs nothing on a machine that does not have it.
 
 return {
   {
     "neovim/nvim-lspconfig",
-    opts = {
-      servers = {
+    opts = function(_, opts)
+      opts.servers = opts.servers or {}
+
+      opts.servers = vim.tbl_deep_extend("force", opts.servers, {
         -- pylsp runs ruff for diagnostics and formatting. Its jedi plugins are
         -- all off because completion comes from elsewhere, and leaving them on
         -- makes pylsp slow enough to notice on a large file.
         pylsp = {
-          -- Provided by uv, not Mason:
-          --   uv tool install python-lsp-server --with python-lsp-ruff
-          mason = false,
           capabilities = {
             textDocument = {
               completion = false,
@@ -51,8 +45,6 @@ return {
         -- Pyrefly exits quietly when it fails, so say so rather than leaving
         -- the buffer with no type information and no explanation.
         pyrefly = {
-          -- Provided by uv, not Mason: uv tool install pyrefly
-          mason = false,
           on_exit = function(code, _, _)
             vim.schedule(function()
               vim.notify("Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
@@ -72,29 +64,42 @@ return {
             },
           },
         },
-      },
-    },
+      })
+
+      -- Last, so that it sees every server the config and the extras asked for.
+      require("util.lsp").keep_available(opts.servers)
+
+      return opts
+    end,
   },
 
-  -- Install only what is wanted, when it is wanted. `:Mason` does the rest by
-  -- hand.
+  -- Mason stays available for installing things by hand with :Mason. It is not
+  -- allowed to install anything on its own: a server that appears without being
+  -- asked for is a server that starts disagreeing with another one in some
+  -- project months later.
   {
     "mason-org/mason.nvim",
-    opts = {
-      ensure_installed = { "stylua" },
-    },
+    opts = function(_, opts)
+      opts.ensure_installed = {}
+      return opts
+    end,
   },
-
-  -- The LazyVim language extras turn on automatic server installation, which
-  -- then tries to fetch servers Mason has no recipe for. pylsp and pyrefly are
-  -- installed system-wide here, so opening a Python file announced two install
-  -- failures and installed nothing. Servers are configured above and enabled
-  -- from whatever is already on PATH.
   {
     "mason-org/mason-lspconfig.nvim",
-    opts = {
-      ensure_installed = {},
-      automatic_enable = false,
-    },
+    opts = function(_, opts)
+      opts.ensure_installed = {}
+      opts.automatic_enable = false
+      return opts
+    end,
+  },
+  {
+    "WhoIsSethDaniel/mason-tool-installer.nvim",
+    optional = true,
+    opts = function(_, opts)
+      opts.ensure_installed = {}
+      opts.auto_update = false
+      opts.run_on_start = false
+      return opts
+    end,
   },
 }
