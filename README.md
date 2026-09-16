@@ -44,6 +44,35 @@ The picker list is the flat view. `<c-t>` sends the same results to Trouble,
 which groups them by file, giving a tree with a count per file. Nothing is
 re-run; it is the same result set shown differently.
 
+## Language servers
+
+Nothing is installed automatically. A server attaches when the project can
+already provide it, and is disabled quietly when nothing can:
+
+1. an executable inside the project, which wins, because it is the version the
+   project pins. Searched for in `.venv/bin`, `venv/bin`, `.direnv/*/bin`,
+   `node_modules/.bin`, `.yarn/bin`, `vendor/bin`, `.bundle/bin`, `bin`,
+   `.tools/bin` and `result/bin`.
+2. an executable on `PATH`.
+
+How it got there is not this configuration's business. apt, uv, npm, mise,
+Mason, or built by hand, all look the same from here and all work. Installing
+the tools is your job; the editor's job is to use what it finds and to say what
+it could not find.
+
+So a project selects its own servers by what it installs, and the same
+configuration behaves differently in each checkout without being edited. In a
+Python project with a virtualenv the servers come out of `.venv/bin` whether or
+not the environment is activated.
+
+A filetype whose server is configured but unavailable warns once, because an
+editor with no language server looks exactly like one with a working server
+until a feature turns out to be missing. `:checkhealth dotfiles` lists every
+server, whether it resolved, and where from.
+
+`:Mason` still works for installing by hand. It is simply never invoked on your
+behalf.
+
 ## Per-project settings
 
 `exrc` is on, so Neovim reads a `.nvim.lua` from the directory it starts in.

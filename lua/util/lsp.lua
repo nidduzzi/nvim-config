@@ -11,8 +11,12 @@
 ---   * an executable inside the project's own environment, which is preferred,
 ---     because it is the version the project pins and it matches the project's
 ---     dependencies
----   * an executable on PATH, which covers tools installed per user or system
----     wide, by whatever tool manager the machine uses
+---   * an executable on PATH
+---
+--- How either of them got there is not the editor's business. A server
+--- installed with apt, uv, npm, mise, Mason or built by hand all look the same
+--- from here, and all work. The editor's job is to use what it finds and to
+--- say what it could not find, not to have an opinion about package managers.
 ---
 --- A project therefore selects its own servers by what it installs, and the
 --- same config behaves differently in each checkout without being edited.
@@ -107,16 +111,7 @@ function M.resolve(name)
     return { cmd = resolved, source = "project" }
   end
 
-  local on_path = vim.fn.exepath(cmd[1])
-  if on_path ~= "" then
-    -- Mason installs into Neovim's own data directory and puts it on PATH, so
-    -- anything installed there would count as "the machine provides this" in
-    -- every project at once. That is the behaviour this module exists to avoid,
-    -- so it is opt-in: set vim.g.lsp_allow_mason = false to ignore them and
-    -- rely only on the project and the real system PATH.
-    if vim.g.lsp_allow_mason == false and on_path:find(vim.fn.stdpath("data") .. "/mason", 1, true) then
-      return nil
-    end
+  if vim.fn.executable(cmd[1]) == 1 then
     return { cmd = resolved, source = "PATH" }
   end
 end

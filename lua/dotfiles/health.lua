@@ -38,12 +38,12 @@ function M.check()
 
   vim.health.start("dotfiles: installing servers")
   vim.health.info(table.concat({
-    "Servers are never installed automatically.",
-    "Install one into the project, so only this project uses it:",
-    "  Python:     uv pip install <server>      (into .venv)",
-    "  Node:       npm install -D <server>      (into node_modules/.bin)",
-    "Or install it for the whole machine, with uv, mise or a package manager.",
-    "Or use :Mason by hand, which installs into Neovim's own data directory.",
+    "Servers are never installed automatically, and how you install one is not",
+    "this configuration's concern. Put the executable either inside the project,",
+    "where only this project will use it, or anywhere on PATH.",
+    "",
+    "Project directories that are searched first:",
+    "  " .. table.concat(lsp.bin_dirs, "  "),
   }, "\n"))
 end
 
