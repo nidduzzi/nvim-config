@@ -10,11 +10,23 @@ local M = {}
 function M.check()
   vim.health.start("dotfiles: language servers for " .. lsp.root(vim.fn.getcwd()))
 
+  -- Resolution happens when nvim-lspconfig loads, which has not necessarily
+  -- happened yet: a health check run before any file is opened would otherwise
+  -- report nothing and look like a broken config. Load the plugin rather than
+  -- rebuilding its options by hand, because resolving a server needs the
+  -- lspconfig definitions to exist, and without them every server looks
+  -- missing.
+  if vim.tbl_isempty(lsp.status) then
+    pcall(function()
+      require("lazy").load({ plugins = { "nvim-lspconfig" } })
+    end)
+  end
+
   local names = vim.tbl_keys(lsp.status)
   table.sort(names)
 
   if #names == 0 then
-    vim.health.info("No servers have been resolved yet. Open a file first.")
+    vim.health.warn("No servers could be resolved. nvim-lspconfig may have failed to load.")
     return
   end
 
@@ -24,6 +36,16 @@ function M.check()
 
     if info.status == "project" then
       vim.health.ok(("%s — from this project: %s"):format(name, info.cmd[1]))
+    elseif info.status == "editor" then
+      local exe = info.cmd and info.cmd[1] or name
+      local found = vim.fn.exepath(exe)
+      if found ~= "" then
+        vim.health.ok(("%s — the editor's own, installed by Mason: %s"):format(name, found))
+      else
+        vim.health.warn(("%s — the editor's own, but Mason has not installed it yet"):format(name), {
+          "It installs on the next start. :Mason shows progress.",
+        })
+      end
     elseif info.status == "PATH" then
       vim.health.ok(("%s — from PATH: %s"):format(name, vim.fn.exepath(info.cmd[1])))
     else
