@@ -76,7 +76,9 @@ return {
         desc = "Grep (everything)",
       },
       {
-        "<leader>sD",
+        -- Not <leader>sD: that is LazyVim's workspace diagnostics, and taking
+        -- it silently removed a feature that had nothing to do with grep.
+        "<leader>sO",
         function()
           Snacks.picker.grep(search.opts("docs"))
         end,

@@ -116,9 +116,20 @@ function M.resolve(name)
   end
 end
 
+--- Servers the editor installs for itself, whatever the project is.
+---
+--- This configuration is written in Lua, so editing it is not a project
+--- concern: it has to work in any checkout, including one that has nothing to
+--- do with Lua. These are therefore installed by Mason and always enabled, and
+--- they are the only things that are.
+---
+--- Everything else is the project's business. Keep this list short; every name
+--- added is a server that will attach somewhere it was not asked for.
+M.baseline = { "lua_ls" }
+
 --- What happened to each server the config asked for. Read by the health check
 --- and by the warning, so both describe the same decisions.
----@type table<string, { status: "project"|"PATH"|"missing", cmd?: string[], filetypes?: string[] }>
+---@type table<string, { status: "project"|"PATH"|"editor"|"missing", cmd?: string[], filetypes?: string[] }>
 M.status = {}
 
 --- Disable every server the project cannot provide, and point the rest at the
@@ -138,8 +149,23 @@ function M.keep_available(servers)
 
     local found = M.resolve(name)
     local declared = vim.lsp.config[name] or {}
+    local is_baseline = vim.tbl_contains(M.baseline, name)
 
-    if not found then
+    if is_baseline then
+      -- Enabled whether or not the executable is there yet: on a new machine
+      -- Mason is still installing it while this runs, and the server attaches
+      -- on the next buffer. A project copy is still preferred if there is one.
+      if found and found.source == "project" then
+        settings.cmd = found.cmd
+      end
+      settings.mason = false
+      servers[name] = settings
+      M.status[name] = {
+        status = found and found.source == "project" and "project" or "editor",
+        cmd = found and found.cmd or declared.cmd,
+        filetypes = declared.filetypes,
+      }
+    elseif not found then
       settings.enabled = false
       servers[name] = settings
       M.status[name] = { status = "missing", filetypes = declared.filetypes }

@@ -73,14 +73,15 @@ return {
     end,
   },
 
-  -- Mason stays available for installing things by hand with :Mason. It is not
-  -- allowed to install anything on its own: a server that appears without being
-  -- asked for is a server that starts disagreeing with another one in some
-  -- project months later.
+  -- Mason installs the editor's own toolchain and nothing else. This config is
+  -- written in Lua, so editing it has to work in any checkout, including ones
+  -- with nothing to do with Lua. Everything beyond this list is the project's
+  -- business: a server that appears without being asked for is a server that
+  -- starts disagreeing with another one in some project months later.
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
-      opts.ensure_installed = {}
+      opts.ensure_installed = { "lua-language-server", "stylua" }
       return opts
     end,
   },
