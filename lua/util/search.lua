@@ -350,6 +350,9 @@ function M.rank_item(item, ctx)
 
   if not cached or (stat and cached.mtime ~= stat.mtime.sec) then
     pending[path] = true
+    -- ctx carries the picker, which is the only way to ask for a re-rank once
+    -- the parsing has been done somewhere it is allowed.
+    M.parse_pending(ctx and ctx.picker)
     return item
   end
 
@@ -376,27 +379,51 @@ function M.rank_item(item, ctx)
   return item
 end
 
---- Parse whatever the last result set could not answer for, then refresh.
+--- True while a drain is already queued, so a burst of results schedules one
+--- pass rather than one per item.
+local draining = false
+
+--- Parse whatever the results mentioned, then rank them again.
 ---
---- Called from on_show, which runs on the main loop where treesitter is
---- allowed. The first search of a session ranks nothing and then corrects
---- itself; every later one reads the cache and ranks immediately.
----@param picker table
+--- Hooked to the results arriving, not to the picker opening. on_show fires
+--- once, when the picker appears — and in a live search that is before a
+--- single character has been typed, so there are no results, nothing is
+--- pending, and the parse that was supposed to happen never did. Every live
+--- search came back in file order with call sites above declarations.
+---
+--- It passed testing because the test passed `search =` up front with
+--- live = false, so results existed before on_show ran. That is not how the
+--- picker is used.
+---@param picker table|nil
 function M.parse_pending(picker)
+  if draining then
+    return
+  end
+
   local paths = vim.tbl_keys(pending)
   if #paths == 0 then
     return
   end
   pending = {}
+  draining = true
 
-  vim.schedule(function()
+  -- Deferred rather than immediate: results arrive in bursts as ripgrep
+  -- streams, and parsing after each one would parse the same files repeatedly
+  -- while the list is still filling.
+  vim.defer_fn(function()
     for _, path in ipairs(paths) do
       definition_lines(path)
     end
+    draining = false
+
+    -- Re-running the search re-runs the transform, which now reads the cache
+    -- and finds nothing pending, so this settles after one pass.
     if picker and not picker.closed then
-      picker:find({ refresh = true })
+      pcall(function()
+        picker:find({ refresh = true })
+      end)
     end
-  end)
+  end, 120)
 end
 
 --- Search without regard to case, and back again.
@@ -447,7 +474,6 @@ function M.opts(name)
     search_preset = preset.name,
     title = "Grep (" .. preset.name .. ")",
     transform = M.rank_item,
-    on_show = M.parse_pending,
   }
 end
 
