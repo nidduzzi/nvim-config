@@ -18,6 +18,26 @@ return {
     "folke/snacks.nvim",
     opts = {
       picker = {
+        -- How results are ranked.
+        --
+        -- frecency and the cwd bonus are both off by default, so a file you
+        -- open twenty times a day ranks exactly like one you have never
+        -- opened. Turning them on makes the ordering depend on your history,
+        -- which is the point: the thing you want is usually the thing you
+        -- wanted before.
+        matcher = {
+          frecency = true,
+          cwd_bonus = true,
+        },
+
+        -- The keys that exist only inside a picker. which-key cannot show
+        -- them — it needs a prefix to wait on, and these have none — and the
+        -- capability list reads global and buffer mappings, not picker ones.
+        -- So the picker says them itself, in its own footer.
+        formatters = {
+          file = { filename_first = false },
+        },
+
         -- Flags shown in the picker title. `regex` and `docs` are the two
         -- worth seeing at a glance while searching.
         toggles = {
@@ -36,6 +56,8 @@ return {
               ["<a-S>"] = { "search_choose_filter", mode = { "i", "n" }, desc = "Choose search scope" },
               ["<a-e>"] = { "search_by_extension", mode = { "i", "n" }, desc = "Filter by extension" },
               ["<a-G>"] = { "search_by_glob", mode = { "i", "n" }, desc = "Filter by path glob" },
+              ["<a-?>"] = { "search_keys", mode = { "i", "n" }, desc = "What can I press in here" },
+              ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
             },
           },
         },
@@ -51,6 +73,12 @@ return {
           end,
           search_by_glob = function(picker)
             search.by_glob(picker)
+          end,
+          search_keys = function(picker)
+            search.show_keys(picker)
+          end,
+          search_ignore_case = function(picker)
+            search.toggle_case(picker)
           end,
         },
       },

@@ -203,15 +203,215 @@ function M.by_glob(picker)
   end)
 end
 
+--- Rank a definition above the places that merely mention it.
+---
+--- Grepping a symbol in a real project buries the declaration: a name is
+--- written once and used fifty times, so the uses win on weight of numbers. In
+--- label-studio, `Project` matched 400 lines, 98 of them inside tests.
+---
+--- The first version of this carried a list of patterns — `^%s*def%s+`,
+--- `^%s*class%s+`, twenty of them, plus eleven more for test paths. That is the
+--- same hand-written approach that, applied to keymaps earlier, silently missed
+--- two of the six keys it was meant to cover. A list like that is wrong for
+--- every language nobody thought of, and nobody maintains it.
+---
+--- Treesitter already knows. Every grammar ships a `locals.scm` written by the
+--- people who wrote the grammar, and it captures `@local.definition.*` on
+--- exactly the nodes that declare something. Asking it costs 1.1ms per file,
+--- measured over label-studio, and the answer is cached.
+---
+--- Languages whose grammar ships no locals query — rust and go, here — get no
+--- opinion rather than a guess. Silence is the honest answer.
+
+--- Definition lines per file, keyed by path and modification time so an edited
+--- file is re-read and an untouched one is not.
+---@type table<string, { mtime: integer, lines: table<integer, boolean> }>
+local definition_cache = {}
+
+--- How long one ranking pass may spend parsing, in milliseconds. A grep over a
+--- large repository can touch hundreds of files; beyond this budget the rest
+--- are ranked without an opinion rather than freezing the picker.
+M.parse_budget_ms = 120
+
+local spent_ms = 0
+
+--- Reset the parsing budget. Called when a picker starts a new search.
+function M.begin_pass()
+  spent_ms = 0
+end
+
+--- Forget what treesitter said about every file.
+function M.forget_definitions()
+  definition_cache = {}
+end
+
+--- The lines of a file on which something is declared, according to that
+--- language's own locals query.
+---@param path string
+---@return table<integer, boolean>|nil nil when the language cannot say
+local function definition_lines(path)
+  local stat = vim.uv.fs_stat(path)
+  if not stat then
+    return nil
+  end
+
+  local cached = definition_cache[path]
+  if cached and cached.mtime == stat.mtime.sec then
+    return cached.lines
+  end
+
+  if spent_ms >= M.parse_budget_ms then
+    return nil
+  end
+  local started = vim.uv.hrtime()
+
+  local filetype = vim.filetype.match({ filename = path })
+  local lang = filetype and vim.treesitter.language.get_lang(filetype)
+  if not lang then
+    return nil
+  end
+
+  local ok_query, query = pcall(vim.treesitter.query.get, lang, "locals")
+  if not ok_query or not query then
+    -- The grammar ships no locals query. Nothing to say about this language.
+    return nil
+  end
+
+  local fd = io.open(path, "r")
+  if not fd then
+    return nil
+  end
+  local source = fd:read("*a")
+  fd:close()
+
+  local ok_parser, parser = pcall(vim.treesitter.get_string_parser, source, lang)
+  if not ok_parser or not parser then
+    return nil
+  end
+
+  local ok_tree, trees = pcall(parser.parse, parser)
+  if not ok_tree or not trees or not trees[1] then
+    return nil
+  end
+
+  local lines = {}
+  for id, node in query:iter_captures(trees[1]:root(), source) do
+    if query.captures[id]:match("^local%.definition") then
+      local row = node:range()
+      lines[row + 1] = true
+    end
+  end
+
+  spent_ms = spent_ms + (vim.uv.hrtime() - started) / 1e6
+  definition_cache[path] = { mtime = stat.mtime.sec, lines = lines }
+  return lines
+end
+
+--- Promote a hit that lands on a declaration.
+---
+--- score_mul scales rather than filters, so a call site still surfaces when it
+--- is the only thing that matches, and a definition inside a test file is
+--- ranked on being a definition, which is what it is.
+---@param item table
+---@return table
+function M.rank_item(item)
+  local path = item.file
+  local lnum = item.pos and item.pos[1] or item.lnum
+  if not path or not lnum then
+    return item
+  end
+
+  -- Assign rather than multiply, and only once. A transform may be run more
+  -- than once on the same item, and `score_mul = score_mul * 2.5` compounds
+  -- every time it is: a second pass turned 2.5 into 6.2, and nothing bounds
+  -- that.
+  if item.ranked_definition == nil then
+    local lines = definition_lines(path)
+    item.ranked_definition = (lines and lines[lnum]) and true or false
+  end
+
+  if item.ranked_definition then
+    item.score_mul = 2.5
+  end
+
+  return item
+end
+
+--- Search without regard to case, and back again.
+---
+--- ripgrep is given --smart-case, so a lowercase query already ignores case
+--- and any capital makes it exact. That is the right default and the wrong one
+--- exactly when you typed a capital and meant a name: searching `Project` will
+--- not find `project`. This forces the insensitive read without retyping.
+---@param picker table
+function M.toggle_case(picker)
+  local args = vim.deepcopy(picker.opts.args or {})
+  local insensitive = false
+
+  for index, arg in ipairs(args) do
+    if arg == "--ignore-case" then
+      table.remove(args, index)
+      insensitive = true
+      break
+    end
+  end
+
+  if not insensitive then
+    table.insert(args, "--ignore-case")
+  end
+
+  picker.opts.args = args
+  picker.title = ("Grep (%s%s)"):format(
+    picker.opts.search_preset or "code",
+    insensitive and "" or ", any case"
+  )
+  picker:find({ refresh = true })
+
+  vim.notify(
+    insensitive and "Case matters again (smart-case)." or "Ignoring case.",
+    vim.log.levels.INFO,
+    { title = "Search" }
+  )
+end
+
+--- Say what can be pressed in here, since a picker's own keys reach neither
+--- which-key nor the capability list.
+---@param picker table
+function M.show_keys(picker)
+  local lines = {
+    "# Inside this picker",
+    "",
+    "  a-s    next search scope (code, everything, documentation)",
+    "  a-S    choose a scope from the list",
+    "  a-e    only these file extensions",
+    "  a-G    only this path glob",
+    "  a-r    regex, or a plain string",
+    "  a-c    ignore case (smart-case is the default: a capital means exact)",
+    "  a-h    include hidden files",
+    "  a-i    include ignored files",
+    "  c-g    live search, or filter what is already found",
+    "  c-t    send these results to Trouble, grouped by file",
+    "  c-f    scroll the preview",
+    "",
+    "Ranking: a hit on a declaration ranks higher, per treesitter.",
+    "The title shows the scope in force.",
+  }
+
+  local _ = picker
+  require("util.agent.panel").show("Picker keys", table.concat(lines, "\n"))
+end
+
 --- Options to open a grep picker with a preset already applied.
 ---@param name string
 ---@return table
 function M.opts(name)
   local preset = M.preset(name) or M.presets()[1]
+  M.begin_pass()
   return {
     args = preset.args,
     search_preset = preset.name,
     title = "Grep (" .. preset.name .. ")",
+    transform = M.rank_item,
   }
 end
 
