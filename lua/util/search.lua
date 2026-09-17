@@ -222,10 +222,16 @@ end
 ---
 --- Languages whose grammar ships no locals query — rust and go, here — get no
 --- opinion rather than a guess. Silence is the honest answer.
+---
+--- It is also more accurate than the patterns were, not merely tidier.
+--- label-studio's core/mixins.py contains `def get_queryset(self):` inside the
+--- Example block of a class docstring. To the grammar that is a string
+--- literal, so treesitter reports no definition and the line ranks as the prose
+--- it is. `^%s*def%s+` would have promoted it above the real declarations.
 
 --- Definition lines per file, keyed by path and modification time so an edited
 --- file is re-read and an untouched one is not.
----@type table<string, { mtime: integer, lines: table<integer, boolean> }>
+---@type table<string, { mtime: integer, lines: table<integer, table<string, boolean>> }>
 local definition_cache = {}
 
 --- How long one ranking pass may spend parsing, in milliseconds. A grep over a
@@ -248,7 +254,7 @@ end
 --- The lines of a file on which something is declared, according to that
 --- language's own locals query.
 ---@param path string
----@return table<integer, boolean>|nil nil when the language cannot say
+---@return table<integer, table<string, boolean>>|nil nil when the language cannot say
 local function definition_lines(path)
   local stat = vim.uv.fs_stat(path)
   if not stat then
@@ -294,11 +300,17 @@ local function definition_lines(path)
     return nil
   end
 
+  -- Keep the name each definition declares, not merely that the line declares
+  -- something. Without it, `queryset = self.get_queryset()` ranks as a
+  -- definition — which it is, of `queryset` — while you were looking for where
+  -- `get_queryset` is declared.
   local lines = {}
   for id, node in query:iter_captures(trees[1]:root(), source) do
     if query.captures[id]:match("^local%.definition") then
       local row = node:range()
-      lines[row + 1] = true
+      local name = vim.treesitter.get_node_text(node, source)
+      lines[row + 1] = lines[row + 1] or {}
+      lines[row + 1][name] = true
     end
   end
 
@@ -307,34 +319,84 @@ local function definition_lines(path)
   return lines
 end
 
+--- Files a result set mentioned that have not been parsed yet.
+---@type table<string, boolean>
+local pending = {}
+
 --- Promote a hit that lands on a declaration.
 ---
---- score_mul scales rather than filters, so a call site still surfaces when it
---- is the only thing that matches, and a definition inside a test file is
---- ranked on being a definition, which is what it is.
+--- This runs inside the finder, which libuv drives from a fast event context.
+--- Almost nothing is allowed there: vim.filetype.match and the treesitter
+--- query both reach into Vimscript and raise E5560, which killed the finder
+--- outright and returned an empty picker with no message. So this only reads
+--- the cache — a table lookup and an fs_stat, both safe — and notes the files
+--- it could not answer for. `M.parse_pending` does the parsing later, on the
+--- main loop.
+---
+--- score_mul is assigned, not multiplied. A transform may run more than once
+--- on the same item, and multiplying compounds: a second pass turned 2.5 into
+--- 6.2 with nothing bounding it.
 ---@param item table
 ---@return table
-function M.rank_item(item)
+function M.rank_item(item, ctx)
   local path = item.file
   local lnum = item.pos and item.pos[1] or item.lnum
   if not path or not lnum then
     return item
   end
 
-  -- Assign rather than multiply, and only once. A transform may be run more
-  -- than once on the same item, and `score_mul = score_mul * 2.5` compounds
-  -- every time it is: a second pass turned 2.5 into 6.2, and nothing bounds
-  -- that.
-  if item.ranked_definition == nil then
-    local lines = definition_lines(path)
-    item.ranked_definition = (lines and lines[lnum]) and true or false
+  local stat = vim.uv.fs_stat(path)
+  local cached = definition_cache[path]
+
+  if not cached or (stat and cached.mtime ~= stat.mtime.sec) then
+    pending[path] = true
+    return item
   end
 
-  if item.ranked_definition then
+  local declared = cached.lines[lnum]
+  if not declared then
+    return item
+  end
+
+  -- What you searched for. A definition on this line only answers your question
+  -- when it is a definition of the name you asked about.
+  local wanted = ctx and ctx.filter and ctx.filter.search or ""
+  if wanted == "" then
     item.score_mul = 2.5
+    return item
+  end
+
+  for name in pairs(declared) do
+    if name == wanted or name:find(wanted, 1, true) then
+      item.score_mul = 2.5
+      return item
+    end
   end
 
   return item
+end
+
+--- Parse whatever the last result set could not answer for, then refresh.
+---
+--- Called from on_show, which runs on the main loop where treesitter is
+--- allowed. The first search of a session ranks nothing and then corrects
+--- itself; every later one reads the cache and ranks immediately.
+---@param picker table
+function M.parse_pending(picker)
+  local paths = vim.tbl_keys(pending)
+  if #paths == 0 then
+    return
+  end
+  pending = {}
+
+  vim.schedule(function()
+    for _, path in ipairs(paths) do
+      definition_lines(path)
+    end
+    if picker and not picker.closed then
+      picker:find({ refresh = true })
+    end
+  end)
 end
 
 --- Search without regard to case, and back again.
@@ -412,6 +474,7 @@ function M.opts(name)
     search_preset = preset.name,
     title = "Grep (" .. preset.name .. ")",
     transform = M.rank_item,
+    on_show = M.parse_pending,
   }
 end
 
