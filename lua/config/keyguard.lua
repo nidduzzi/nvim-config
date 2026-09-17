@@ -23,6 +23,7 @@ local M = {}
 ---@field before string
 ---@field after string
 ---@field who string
+---@field mine boolean  this config made the change, rather than a plugin
 ---@field buffer boolean
 
 ---@type keyguard.Overwrite[]
@@ -49,8 +50,14 @@ local function summarise(map)
   return map.callback and "<callback>" or ""
 end
 
+--- This config's own directory, with symlinks resolved: the trial runs from a
+--- worktree reached through a link, so comparing the unresolved paths says the
+--- config is a stranger to itself.
+local config_root = vim.uv.fs_realpath(vim.fn.stdpath("config")) or vim.fn.stdpath("config")
+
 --- Where the call came from, skipping this file and the wrapper itself.
----@return string
+---@return string label
+---@return boolean mine  true when this config made the call
 local function caller()
   for level = 3, 8 do
     local info = debug.getinfo(level, "Sl")
@@ -63,12 +70,15 @@ local function caller()
       -- A plugin's own path is the useful part: .../lazy/which-key.nvim/...
       local plugin = source:match("/lazy/([^/]+)/")
       if plugin then
-        return ("%s (%s:%d)"):format(plugin, vim.fn.fnamemodify(source, ":t"), info.currentline or 0)
+        return ("%s (%s:%d)"):format(plugin, vim.fn.fnamemodify(source, ":t"), info.currentline or 0), false
       end
-      return ("%s:%d"):format(vim.fn.fnamemodify(source, ":~:."), info.currentline or 0)
+
+      local real = vim.uv.fs_realpath(source) or source
+      local mine = real:sub(1, #config_root) == config_root
+      return ("%s:%d"):format(vim.fn.fnamemodify(source, ":~:."), info.currentline or 0), mine
     end
   end
-  return "unknown"
+  return "unknown", false
 end
 
 --- True while the Lua helper is running, so the API call it makes underneath
@@ -89,7 +99,7 @@ local function record(mode, lhs, before, buffer)
   -- The caller has to be read here, while the stack that made the call still
   -- exists. Reading it inside the scheduled part below answers "unknown"
   -- every time, which is what the first version of this did.
-  local who = caller()
+  local who, mine = caller()
 
   -- What the key became is only knowable after the set has happened.
   vim.schedule(function()
@@ -111,11 +121,16 @@ local function record(mode, lhs, before, buffer)
       before = previous,
       after = after,
       who = who,
+      mine = mine,
       buffer = buffer,
     }
     table.insert(M.overwrites, entry)
 
-    if M.watched[mode .. entry.lhs] then
+    -- A key this config takes on purpose is not the fault being watched for.
+    -- The watch list names the keys this config owns, so its own deliberate
+    -- overwrite of <leader>? matched every startup and cried wolf. Only a
+    -- third party taking one of these keys is news.
+    if M.watched[mode .. entry.lhs] and not mine then
       vim.notify(
         ("%s was %s\nnow %s\ntaken by %s"):format(entry.lhs, entry.before, entry.after, entry.who),
         vim.log.levels.WARN,
