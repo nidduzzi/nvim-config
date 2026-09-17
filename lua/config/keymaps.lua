@@ -10,8 +10,30 @@ local map = vim.keymap.set
 -- Clear the search highlight without typing a command.
 map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 
--- Diagnostics for this buffer, in the location list.
-map("n", "<leader>xq", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
+-- Diagnostics for this buffer, in a plain location list, which is what the
+-- old configuration had on <leader>q. Not <leader>xq: that is LazyVim's
+-- Quickfix List, and taking it was an accident, found by the collision
+-- check rather than by noticing the feature had gone.
+map("n", "<leader>xD", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
+
+-- Watch the keys this config depends on. Something taking one of these means a
+-- feature quietly stopped existing, which is worth hearing about when it
+-- happens rather than when it is next needed.
+local keyguard = require("config.keyguard")
+for _, lhs in ipairs({
+  "<leader><leader>",
+  "<leader>/",
+  "<leader>?",
+  "<leader>sg",
+  "<leader>sw",
+  "<leader>e",
+  "<leader>gd",
+  "<leader>gm",
+  "<leader>gw",
+  "<leader>hh",
+}) do
+  keyguard.watch("n", lhs)
+end
 
 -- Neovim's own LSP keys describe themselves with the function they call, and
 -- fire in buffers with no language server. See lua/config/lsp-keys.lua.
