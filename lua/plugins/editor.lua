@@ -25,7 +25,7 @@ return {
       {
         "<leader>sy",
         function()
-          Snacks.picker.yanky()
+          require("util.yank").history()
         end,
         desc = "Yank history",
       },

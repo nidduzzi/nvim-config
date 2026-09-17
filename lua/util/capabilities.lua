@@ -18,7 +18,7 @@
 
 local M = {}
 
----@alias capability { name: string, desc: string, key?: string, kind: string, run: fun() }
+---@alias capability { name: string, desc: string, key?: string, kind: string, writes?: boolean, run: fun() }
 
 --- What a plugin's undescribed keys actually do.
 ---
@@ -156,7 +156,7 @@ function M.features()
       key = "<leader>sy",
       kind = "feature",
       run = function()
-        Snacks.picker.yanky()
+        require("util.yank").history()
       end,
     },
     {
@@ -503,7 +503,33 @@ function M.items(scope)
   local all = M.features()
   vim.list_extend(all, M.keymaps())
   vim.list_extend(all, M.commands())
-  return all
+
+  -- One entry per key. A feature and the mapping that runs it are the same
+  -- thing described twice, and the copies are not interchangeable: the feature
+  -- knows what it does and whether it writes, and the keymap only knows which
+  -- key to press. Choosing "Yank history" hit the keymap copy, fed <leader>sy,
+  -- and reached the paste the feature's own guard exists to prevent.
+  local best = {}
+  local order = {}
+  local rank = { feature = 3, keymap = 2, command = 1 }
+
+  for _, item in ipairs(all) do
+    local id = (item.key and item.key ~= "" and item.key ~= "-") and ("key:" .. item.key) or ("name:" .. item.name)
+    local held = best[id]
+
+    if not held then
+      best[id] = item
+      table.insert(order, id)
+    elseif (rank[item.kind] or 0) > (rank[held.kind] or 0) then
+      best[id] = item
+    end
+  end
+
+  local deduped = {}
+  for _, id in ipairs(order) do
+    table.insert(deduped, best[id])
+  end
+  return deduped
 end
 
 --- Open the picker.
@@ -601,6 +627,31 @@ function M.open(scope, order)
     confirm = function(picker, item)
       picker:close()
       if not (item and item.capability) then
+        return
+      end
+
+      -- Some features end by writing into the current buffer, and the start
+      -- screen cannot be written into. Reaching this list from the dashboard
+      -- is a normal way in — it is on `?` there — so this is a normal thing to
+      -- hit, and the editor's own answer is `E21: Cannot make changes,
+      -- 'modifiable' is off`, which tells someone who asked for their yank
+      -- history nothing about what to do next.
+      --
+      -- Catching the error is not possible from here: the feature only opens a
+      -- picker, and the write happens later inside that picker's own confirm.
+      -- Three attempts at catching it failed for that reason, and a fourth at
+      -- wrapping vim.notify failed because noice renders Vim's errors from the
+      -- msg_show UI event and never touches the Lua notify path. So the write
+      -- is refused before it is attempted, which is the only place the answer
+      -- is still useful.
+      if item.capability.writes and not vim.bo.modifiable then
+        vim.notify(
+          ("%s finishes by writing into the current buffer, and this one cannot be written to.\n\nOpen a file first — <leader>ff — then try again."):format(
+            item.capability.name
+          ),
+          vim.log.levels.WARN,
+          { title = "Nothing to write into" }
+        )
         return
       end
 
