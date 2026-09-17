@@ -48,7 +48,12 @@ function M.show(title, text, opts)
   vim.bo[buf].modifiable = false
   vim.bo[buf].bufhidden = "wipe"
 
-  win = vim.api.nvim_open_win(buf, true, {
+  -- Opened without taking focus. Taking it broke the hint ladder outright:
+  -- pressing <leader>ah again was evaluated in the panel buffer, where the
+  -- position is not the code's position, so the ladder reset and rung two was
+  -- rung one again. Reading an answer should not move the cursor out of the
+  -- work either.
+  win = vim.api.nvim_open_win(buf, false, {
     relative = "cursor",
     row = 1,
     col = 0,
@@ -69,6 +74,24 @@ function M.show(title, text, opts)
   for _, key in ipairs({ "q", "<Esc>" }) do
     vim.keymap.set("n", key, M.close, { buffer = buf, nowait = true, desc = "Close this answer" })
   end
+
+  -- Nothing has focus in the panel, so nothing can press q in it. Close on the
+  -- next move instead, which is what someone does when they have read it.
+  --
+  -- Armed a moment later, not now: opening a window fires CursorMoved itself,
+  -- and a once-only autocmd would spend itself on that and close the panel
+  -- before it had been read.
+  local group = vim.api.nvim_create_augroup("agent-panel-close", { clear = true })
+  vim.defer_fn(function()
+    if not (win and vim.api.nvim_win_is_valid(win)) then
+      return
+    end
+    vim.api.nvim_create_autocmd({ "CursorMoved", "InsertEnter", "BufLeave" }, {
+      group = group,
+      once = true,
+      callback = M.close,
+    })
+  end, 200)
 end
 
 return M
