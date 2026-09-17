@@ -151,15 +151,67 @@ function M.input(opts, on_done)
   })
 end
 
+--- Directories whose contents are not this project's code.
+---
+--- Walking them is slow and the answers are wrong: the extensions inside
+--- node_modules describe somebody else's project, and offering them as filters
+--- for this one is worse than offering nothing.
+---@type table<string, boolean>
+local vendored = {
+  [".git"] = true,
+  [".hg"] = true,
+  [".svn"] = true,
+  [".venv"] = true,
+  ["venv"] = true,
+  ["node_modules"] = true,
+  ["__pycache__"] = true,
+  ["target"] = true,
+  ["dist"] = true,
+  ["build"] = true,
+  [".mypy_cache"] = true,
+  [".pytest_cache"] = true,
+  [".ruff_cache"] = true,
+  [".next"] = true,
+  [".tox"] = true,
+}
+
+---@param path string
+---@return boolean
+local function is_vendored(path)
+  for part in path:gmatch("[^/]+") do
+    if vendored[part] then
+      return true
+    end
+  end
+  return false
+end
+
+--- Answers already worked out, per project. The walk is bounded but not free:
+--- measured at 45ms over label-studio's 5626 files, on the main loop, every
+--- time the extension filter is opened. Once per project is plenty — the set
+--- of languages in a repository does not change while you are looking at it.
+---@type table<string, string[]>
+local extension_cache = {}
+
+--- Forget the cached walks, for when a project really has changed shape.
+function M.rescan()
+  extension_cache = {}
+end
+
 --- The file extensions this project actually contains, most common first, so
 --- the extension filter can offer them rather than ask you to remember.
 ---@param limit? integer
 ---@return string[]
 function M.extensions(limit)
+  local where = root()
+  if extension_cache[where] then
+    return vim.list_slice(extension_cache[where], 1, limit or 15)
+  end
+
   local counts = {}
   local found = vim.fs.find(function(name, path)
-    return name:match("%.[%w]+$") ~= nil and not path:match("/%.git/")
-  end, { path = root(), type = "file", limit = 4000 })
+    return name:match("%.[%w]+$") ~= nil and not is_vendored(path)
+  end, { path = where, type = "file", limit = 4000 })
 
   for _, file in ipairs(found) do
     local ext = file:match("%.([%w]+)$")
@@ -173,6 +225,7 @@ function M.extensions(limit)
     return counts[a] > counts[b]
   end)
 
+  extension_cache[where] = exts
   return vim.list_slice(exts, 1, limit or 15)
 end
 
@@ -182,7 +235,7 @@ end
 function M.top_level_globs()
   local out = {}
   for name, kind in vim.fs.dir(root()) do
-    if kind == "directory" and not name:match("^%.") then
+    if kind == "directory" and not name:match("^%.") and not vendored[name] then
       table.insert(out, name .. "/**")
     end
   end

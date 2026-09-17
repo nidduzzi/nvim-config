@@ -228,17 +228,61 @@ local warned = {}
 --- without one until a feature is missing. Repeating it on every buffer would
 --- be worse.
 ---@param filetype string
+--- Filetypes that no language server serves, so saying one is missing would be
+--- noise rather than news. Buffers the editor makes for itself, and prose.
+---@type string[]
+M.unserved = {
+  "checkhealth",
+  "gitcommit",
+  "gitrebase",
+  "help",
+  "lazy",
+  "man",
+  "mason",
+  "qf",
+  "snacks_dashboard",
+  "snacks_picker_input",
+  "snacks_picker_list",
+  "text",
+  "trouble",
+  "TelescopePrompt",
+}
+
 function M.warn_missing(filetype)
   if warned[filetype] or filetype == "" then
     return
   end
   warned[filetype] = true
 
+  -- Filetypes nobody serves, where silence is the right answer.
+  if vim.tbl_contains(M.unserved, filetype) then
+    return
+  end
+
   local missing = {}
+  local configured = false
   for name, info in pairs(M.status) do
-    if info.status == "missing" and vim.tbl_contains(info.filetypes or {}, filetype) then
-      table.insert(missing, name)
+    if vim.tbl_contains(info.filetypes or {}, filetype) then
+      configured = true
+      if info.status == "missing" then
+        table.insert(missing, name)
+      end
     end
+  end
+
+  -- Nothing is configured for this language at all, which is a different
+  -- problem with a different fix. Returning early here was wrong in a way that
+  -- only shows up outside the languages this configuration enables: a Rust or
+  -- C file opened with no server, no diagnostics and no explanation, because
+  -- rust_analyzer and clangd are never configured and so were never "missing".
+  if not configured then
+    vim.notify(
+      ("No language server for %s, and none is configured for it.\n\n:LazyExtras adds language support — look for lang.%s.\nA server already on PATH is picked up without one.")
+        :format(filetype, filetype),
+      vim.log.levels.WARN,
+      { title = "Language servers" }
+    )
+    return
   end
 
   if #missing == 0 then
