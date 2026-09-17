@@ -13,6 +13,10 @@ map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 -- Diagnostics for this buffer, in the location list.
 map("n", "<leader>xq", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
 
+-- Neovim's own LSP keys describe themselves with the function they call, and
+-- fire in buffers with no language server. See lua/config/lsp-keys.lua.
+require("config.lsp-keys").setup()
+
 -- Search the editor itself: "what can I do here". Every capability this config
 -- adds, with the key that runs it, matched on name, description and key alike,
 -- so "conflict" finds the merge view without knowing it is <leader>gm.
