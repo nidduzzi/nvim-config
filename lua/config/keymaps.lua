@@ -31,9 +31,21 @@ map("n", "<leader>cI", function()
   require("util.lsp_commands").apply_kind("source.organizeImports", "Organize imports")
 end, { desc = "Organize imports" })
 
-map("n", "<leader>cA", function()
+-- Not <leader>cA: LazyVim binds that, buffer-locally, to its Source Action
+-- menu, which already offers every source.* action a server has. A global
+-- mapping there loses the argument silently and takes a working feature with
+-- it, which is the same mistake as taking which-key's key.
+map("n", "<leader>cq", function()
   require("util.lsp_commands").apply_kind("source.fixAll", "Fix everything fixable")
 end, { desc = "Fix everything fixable" })
+
+-- Refactors, on their own rather than mixed into the code action menu. Which
+-- servers answer these varies: ruff and pyright offer source actions, while
+-- pyrefly advertises refactor.extract and friends and currently returns none,
+-- so this says who was asked and what came back.
+map({ "n", "x" }, "<leader>cw", function()
+  require("util.lsp_commands").refactor()
+end, { desc = "Refactor here" })
 
 -- Call and type hierarchy: answered by pyrefly, rust-analyzer, clangd and
 -- others, with no default key in Neovim.

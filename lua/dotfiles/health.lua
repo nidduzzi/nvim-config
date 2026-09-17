@@ -46,6 +46,8 @@ function M.check()
           "It installs on the next start. :Mason shows progress.",
         })
       end
+    elseif info.status == "ignored" then
+      vim.health.info(("%s — provided here, but this project's .nvim.lua ignores it"):format(name))
     elseif info.status == "PATH" then
       vim.health.ok(("%s — from PATH: %s"):format(name, vim.fn.exepath(info.cmd[1])))
     else

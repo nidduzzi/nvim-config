@@ -202,6 +202,32 @@ function M.apply_action(client, action, label)
   end, 0)
 end
 
+--- Offer the refactors available at the cursor, or say why there are none.
+---
+--- `vim.lsp.buf.code_action()` mixes refactors in with quick fixes and source
+--- actions, so a rename-extract-inline menu is reachable but never direct.
+--- Asking for the refactor kinds alone also makes it obvious when a server
+--- advertises them and returns nothing, which is where several Python servers
+--- are today.
+function M.refactor()
+  local clients = vim.lsp.get_clients({ bufnr = 0, method = "textDocument/codeAction" })
+
+  if #clients == 0 then
+    vim.notify("No language server here offers code actions.", vim.log.levels.WARN, {
+      title = "Refactor",
+    })
+    return
+  end
+
+  vim.lsp.buf.code_action({
+    context = {
+      diagnostics = {},
+      only = { "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "refactor.move" },
+    },
+    apply = false,
+  })
+end
+
 --- What each attached server could do that this buffer has no key for.
 function M.report()
   local lines = {}
