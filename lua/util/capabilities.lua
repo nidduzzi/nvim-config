@@ -17,6 +17,15 @@ local M = {}
 --- The scopes `<Tab>` cycles through, in order.
 M.scopes = { "everything", "features", "keymaps" }
 
+--- How the list is ordered, which is really which question is being asked.
+---
+---   by action — "what runs the thing I want", the list reads as verbs
+---   by key    — "what does this key do", the list reads as a keyboard
+---
+--- `<a-o>` switches. Fuzzy matching covers both either way; the order decides
+--- what the list looks like when you have not typed anything yet.
+M.orders = { "by action", "by key" }
+
 --- What this configuration adds on top of a stock editor.
 ---
 --- Kept by hand on purpose: generating it would produce every keymap in the
@@ -38,8 +47,8 @@ function M.features()
     },
     {
       name = "Grep, everything",
-      desc = "Or press a-d inside a grep to cycle to it",
-      key = "<leader>sg a-d",
+      desc = "Or press a-s inside a grep to cycle to it",
+      key = "<leader>sg a-s",
       kind = "feature",
       run = function()
         Snacks.picker.grep(search.opts("all"))
@@ -47,8 +56,8 @@ function M.features()
     },
     {
       name = "Grep, documentation only",
-      desc = "Or press a-d twice inside a grep to cycle to it",
-      key = "<leader>sg a-d a-d",
+      desc = "Or press a-s twice inside a grep to cycle to it",
+      key = "<leader>sg a-s a-s",
       kind = "feature",
       run = function()
         Snacks.picker.grep(search.opts("docs"))
@@ -56,7 +65,7 @@ function M.features()
     },
     {
       name = "Search filters",
-      desc = "Inside a grep: a-d cycles, a-p chooses, a-e by extension, a-G by path glob",
+      desc = "Inside a grep: a-s cycles, a-S chooses, a-e by extension, a-G by path glob",
       kind = "feature",
       run = function()
         Snacks.picker.grep(search.opts("code"))
@@ -104,6 +113,24 @@ function M.features()
       kind = "feature",
       run = function()
         require("util.diff").toggle("DiffviewFileHistory %")
+      end,
+    },
+    {
+      name = "Switch worktree",
+      desc = "Another checkout of this repository, on another branch",
+      key = "<leader>gw",
+      kind = "feature",
+      run = function()
+        require("util.worktree").pick()
+      end,
+    },
+    {
+      name = "Worktree for a branch",
+      desc = "Check a branch out beside the repository, without disturbing this one",
+      key = "<leader>gW",
+      kind = "feature",
+      run = function()
+        require("util.worktree").pick_branch()
       end,
     },
     {
@@ -207,6 +234,41 @@ function M.features()
   }
 end
 
+--- Say in plain words what a mapping does.
+---
+--- A mapping's own description is written for a person, so prefer it. What is
+--- left is machinery: a Lua callback prints as `<Lua function 42>` and a right
+--- hand side prints as keystrokes, neither of which answers "what does this
+--- key do". Commands can be read back into a sentence; anything else is better
+--- left out of a list meant to be read.
+---@param map table a keymap from nvim_buf_get_keymap
+---@return string
+local function plain_description(map)
+  local description = map.desc or ""
+
+  -- which-key registers a trigger mapping for every prefix so it can pop up;
+  -- those are plumbing, and listing them buries the real keys.
+  if description:find("which%-key%-trigger") then
+    return ""
+  end
+
+  if description ~= "" then
+    return description
+  end
+
+  local rhs = map.rhs or ""
+
+  -- <cmd>DiffviewClose<cr> reads back as "run :DiffviewClose".
+  local command = rhs:match("^[<:]?[Cc][Mm][Dd]?>?:?(.-)<[Cc][Rr]>$") or rhs:match("^:(.-)<[Cc][Rr]>$")
+  if command and command ~= "" then
+    return "run :" .. vim.trim(command)
+  end
+
+  -- A Lua callback with no description tells the reader nothing a function
+  -- name would not obscure further.
+  return ""
+end
+
 --- The keys bound in this buffer: what `<leader>?` showed before.
 ---@return capability[]
 function M.keymaps()
@@ -216,15 +278,8 @@ function M.keymaps()
   for _, mode in ipairs({ "n", "x", "i" }) do
     for _, map in ipairs(vim.api.nvim_buf_get_keymap(0, mode)) do
       local lhs = vim.fn.keytrans(map.lhs or "")
-      local description = map.desc or map.rhs or ""
+      local description = plain_description(map)
 
-      -- which-key registers a trigger mapping for every prefix so it can pop
-      -- up; those are plumbing, and listing them buries the real keys.
-      if description:find("which%-key%-trigger") then
-        description = ""
-      end
-
-      -- A key with no description is noise in a list meant to be read.
       if description ~= "" and not seen[mode .. lhs] then
         seen[mode .. lhs] = true
         table.insert(items, {
@@ -264,11 +319,27 @@ end
 
 --- Open the picker.
 ---@param scope? string one of M.scopes. Default: everything.
-function M.open(scope)
+---@param order? string one of M.orders. Default: by action.
+function M.open(scope, order)
   scope = scope or M.scopes[1]
+  order = order or M.orders[1]
+
+  local capabilities = M.items(scope)
+
+  if order == "by key" then
+    table.sort(capabilities, function(a, b)
+      -- Mappings without a key sink to the bottom: they answer the other
+      -- question, and there is no key to read them by.
+      local ak, bk = a.key or "~~~", b.key or "~~~"
+      if ak == bk then
+        return a.name < b.name
+      end
+      return ak < bk
+    end)
+  end
 
   local items = {}
-  for index, capability in ipairs(M.items(scope)) do
+  for index, capability in ipairs(capabilities) do
     table.insert(items, {
       idx = index,
       score = 0,
@@ -288,23 +359,27 @@ function M.open(scope)
   Snacks.picker.pick({
     source = "capabilities",
     items = items,
-    title = table.concat(tabs, "") .. "  <Tab> switches",
+    title = table.concat(tabs, "") .. "  <Tab> scope   <a-o> " .. order,
     layout = { preset = "select", layout = { width = 0.8, height = 0.8 } },
     format = function(item)
       local capability = item.capability
-      return {
-        { capability.kind == "feature" and "● " or "○ ", "SnacksPickerSpecial" },
-        { ("%-30s"):format(capability.name:sub(1, 30)), "SnacksPickerLabel" },
-        { "  ", "SnacksPickerComment" },
-        { ("%-16s"):format(capability.key or ""), "SnacksPickerSpecial" },
-        { "  ", "SnacksPickerComment" },
-        { capability.desc, "SnacksPickerComment" },
-      }
+      local mark = { capability.kind == "feature" and "● " or "○ ", "SnacksPickerSpecial" }
+      local key = { ("%-18s"):format(capability.key or ""), "SnacksPickerSpecial" }
+      local name = { ("%-30s"):format(capability.name:sub(1, 30)), "SnacksPickerLabel" }
+      local gap = { "  ", "SnacksPickerComment" }
+      local desc = { capability.desc, "SnacksPickerComment" }
+
+      -- Reading by key means scanning the key column, so it leads.
+      if order == "by key" then
+        return { mark, key, gap, name, gap, desc }
+      end
+      return { mark, name, gap, key, gap, desc }
     end,
     win = {
       input = {
         keys = {
           ["<Tab>"] = { "capability_scope", mode = { "i", "n" }, desc = "Switch scope" },
+          ["<a-o>"] = { "capability_order", mode = { "i", "n" }, desc = "Order by action or by key" },
         },
       },
     },
@@ -319,7 +394,13 @@ function M.open(scope)
         end
         picker:close()
         vim.schedule(function()
-          M.open(M.scopes[(index % #M.scopes) + 1])
+          M.open(M.scopes[(index % #M.scopes) + 1], order)
+        end)
+      end,
+      capability_order = function(picker)
+        picker:close()
+        vim.schedule(function()
+          M.open(scope, order == M.orders[1] and M.orders[2] or M.orders[1])
         end)
       end,
     },

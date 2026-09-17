@@ -30,8 +30,10 @@ return {
         win = {
           input = {
             keys = {
-              ["<a-d>"] = { "search_cycle_filter", mode = { "i", "n" }, desc = "Cycle search filter" },
-              ["<a-p>"] = { "search_choose_filter", mode = { "i", "n" }, desc = "Choose search filter" },
+              -- Not <a-d> or <a-p>: those are snacks' own inspect and
+              -- toggle-preview, and taking them removed working features.
+              ["<a-s>"] = { "search_cycle_filter", mode = { "i", "n" }, desc = "Cycle search scope" },
+              ["<a-S>"] = { "search_choose_filter", mode = { "i", "n" }, desc = "Choose search scope" },
               ["<a-e>"] = { "search_by_extension", mode = { "i", "n" }, desc = "Filter by extension" },
               ["<a-G>"] = { "search_by_glob", mode = { "i", "n" }, desc = "Filter by path glob" },
             },
@@ -74,14 +76,14 @@ return {
       {
         -- One grep, not three. Which files it searches is a decision made
         -- while reading the results, not before opening the picker, so the
-        -- filter is a key inside it: <a-d> cycles code, everything and
-        -- documentation, <a-p> picks from the list. Three keys on a prefix
-        -- that already holds thirty-five bought nothing that <a-d> did not.
+        -- filter is a key inside it: <a-s> cycles code, everything and
+        -- documentation, <a-S> picks from the list. Three keys on a prefix
+        -- that already holds thirty-five bought nothing that <a-s> did not.
         "<leader>sg",
         function()
           Snacks.picker.grep(search.opts("code"))
         end,
-        desc = "Grep (a-d cycles the filter)",
+        desc = "Grep (a-s cycles the scope)",
       },
       {
         "<leader>sw",

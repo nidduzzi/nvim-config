@@ -100,6 +100,20 @@ return {
         end,
         desc = "Diff: merge conflicts (toggle)",
       },
+      {
+        "<leader>gw",
+        function()
+          require("util.worktree").pick()
+        end,
+        desc = "Worktrees: switch",
+      },
+      {
+        "<leader>gW",
+        function()
+          require("util.worktree").pick_branch()
+        end,
+        desc = "Worktrees: check out a branch beside this one",
+      },
     },
     opts = {
       enhanced_diff_hl = true,
