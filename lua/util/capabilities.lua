@@ -405,6 +405,39 @@ function M.keymaps()
   return items
 end
 
+--- The key that runs each command, where one does.
+---
+--- This is the point of listing commands at all. Someone learning this editor
+--- reaches for the command they can describe — "close" finds `:tabclose` —
+--- and a list that stops there teaches them to keep using the long way. Of the
+--- 641 commands here, 22 have a key, and none of them said so.
+---
+--- Read from the mappings rather than written down: a key whose right-hand
+--- side is `<cmd>BufferLineCloseLeft<cr>` says what it runs, so the index
+--- builds itself and stays right when a plugin changes its bindings.
+---@return table<string, string>
+local function keys_by_command()
+  local index = {}
+
+  for _, mode in ipairs({ "n", "x" }) do
+    local maps = vim.api.nvim_get_keymap(mode)
+    vim.list_extend(maps, vim.api.nvim_buf_get_keymap(0, mode))
+
+    for _, map in ipairs(maps) do
+      local rhs = map.rhs or ""
+      local command = rhs:match("^[<:]?[Cc][Mm][Dd]?>?:?(.-)<[Cc][Rr]>$") or rhs:match("^:(.-)<[Cc][Rr]>$")
+      if command then
+        local name = vim.trim(command):match("^(%a[%w_]*)")
+        if name and not index[name] then
+          index[name] = pretty_key(map.lhs)
+        end
+      end
+    end
+  end
+
+  return index
+end
+
 --- The editor's own Ex commands, so `:tabclose` is findable by typing "close".
 ---
 --- Built-in commands carry no description anywhere Neovim will tell us about,
@@ -416,12 +449,14 @@ end
 function M.commands()
   local items = {}
   local seen = {}
+  local keys = keys_by_command()
 
   for name, command in pairs(vim.api.nvim_get_commands({})) do
     seen[name] = true
     table.insert(items, {
       name = ":" .. name,
       desc = (type(command) == "table" and command.definition) and tostring(command.definition):sub(1, 120) or "editor command",
+      key = keys[name],
       kind = "command",
       run = function()
         vim.api.nvim_feedkeys(":" .. name .. " ", "n", false)
@@ -436,6 +471,7 @@ function M.commands()
       table.insert(items, {
         name = ":" .. name,
         desc = "built-in command",
+        key = keys[name],
         kind = "command",
         run = function()
           vim.api.nvim_feedkeys(":" .. name .. " ", "n", false)
@@ -559,9 +595,22 @@ function M.open(scope, order)
     },
     confirm = function(picker, item)
       picker:close()
-      if item and item.capability then
-        vim.schedule(item.capability.run)
+      if not (item and item.capability) then
+        return
       end
+
+      -- The teaching moment. Someone who found this by describing it has just
+      -- shown they do not know the key, and this is the one instant where the
+      -- key means something concrete: it is the thing that just happened.
+      -- Reading it in a list beforehand is how a key is forgotten.
+      local key = item.capability.key
+      if key and key ~= "" then
+        vim.notify(("%s does this."):format(key), vim.log.levels.INFO, {
+          title = item.capability.name,
+        })
+      end
+
+      vim.schedule(item.capability.run)
     end,
   })
 end

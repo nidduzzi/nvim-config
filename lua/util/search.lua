@@ -436,33 +436,6 @@ function M.toggle_case(picker)
   )
 end
 
---- Say what can be pressed in here, since a picker's own keys reach neither
---- which-key nor the capability list.
----@param picker table
-function M.show_keys(picker)
-  local lines = {
-    "# Inside this picker",
-    "",
-    "  a-s    next search scope (code, everything, documentation)",
-    "  a-S    choose a scope from the list",
-    "  a-e    only these file extensions",
-    "  a-G    only this path glob",
-    "  a-r    regex, or a plain string",
-    "  a-c    ignore case (smart-case is the default: a capital means exact)",
-    "  a-h    include hidden files",
-    "  a-i    include ignored files",
-    "  c-g    live search, or filter what is already found",
-    "  c-t    send these results to Trouble, grouped by file",
-    "  c-f    scroll the preview",
-    "",
-    "Ranking: a hit on a declaration ranks higher, per treesitter.",
-    "The title shows the scope in force.",
-  }
-
-  local _ = picker
-  require("util.agent.panel").show("Picker keys", table.concat(lines, "\n"))
-end
-
 --- Options to open a grep picker with a preset already applied.
 ---@param name string
 ---@return table

@@ -56,7 +56,12 @@ return {
               ["<a-S>"] = { "search_choose_filter", mode = { "i", "n" }, desc = "Choose search scope" },
               ["<a-e>"] = { "search_by_extension", mode = { "i", "n" }, desc = "Filter by extension" },
               ["<a-G>"] = { "search_by_glob", mode = { "i", "n" }, desc = "Filter by path glob" },
-              ["<a-?>"] = { "search_keys", mode = { "i", "n" }, desc = "What can I press in here" },
+              -- snacks already builds this list from the live keymap table.
+              -- A hand-written one was the third time in this work that
+              -- writing down what could be derived went stale on contact.
+              -- It is bound here only because the built-in `?` is normal-mode
+              -- and the picker opens in insert, so nobody ever reaches it.
+              ["<a-/>"] = { "toggle_help_input", mode = { "i", "n" }, desc = "What can I press in here" },
               ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
             },
           },
@@ -73,9 +78,6 @@ return {
           end,
           search_by_glob = function(picker)
             search.by_glob(picker)
-          end,
-          search_keys = function(picker)
-            search.show_keys(picker)
           end,
           search_ignore_case = function(picker)
             search.toggle_case(picker)
