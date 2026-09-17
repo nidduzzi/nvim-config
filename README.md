@@ -25,8 +25,7 @@ while the picker is open, not a decision made before opening it.
 | Key          | Effect                                              |
 | ------------ | --------------------------------------------------- |
 | `<leader>sg` | Grep, documentation excluded. The usual case.       |
-| `<leader>sG` | Grep everything.                                    |
-| `<leader>sD` | Grep documentation only.                            |
+| `<leader>/`  | The same thing, on a key that needs no prefix.      |
 | `<leader>sw` | Grep the word under the cursor, documentation excluded. |
 | `<a-d>`      | Cycle: code → all → docs → any project presets.     |
 | `<a-p>`      | Choose a preset from a list.                        |
@@ -37,6 +36,15 @@ while the picker is open, not a decision made before opening it.
 
 The active preset is shown in the picker title, so there is never a doubt
 about what is being searched.
+
+There is deliberately one grep key rather than one per filter. Which files to
+search is a decision made while reading results, not before opening the picker,
+and `<leader>s` already carries thirty-five bindings without three more that
+`<a-d>` covers between them.
+
+`<leader>?` searches the editor itself: every capability this config adds, with
+the key that runs it, matched on name, description and key alike. Searching
+"conflict" finds the merge view without knowing it is `<leader>gm`.
 
 ### Flat list or tree
 
