@@ -11,6 +11,12 @@
 -- So the dashboard runs the same entry points, and says which key it is really
 -- pressing. A start screen is the first thing anyone reads and the last place
 -- to teach a key, so the keys are on it.
+--
+-- In the key column rather than beside the name. snacks renders `label` where
+-- it would otherwise render `key`, so the column shows <leader>ff while `f`
+-- stays bound — one key per row instead of two competing ones. Both work:
+-- <leader>ff is a global mapping, so it is live on the start screen too, and
+-- `f` remains the shortcut for anyone who already knows it.
 
 local search = require("util.search")
 
@@ -24,7 +30,8 @@ return {
             {
               icon = " ",
               key = "f",
-              desc = "Find File            <leader>ff",
+              desc = "Find File",
+              label = "<leader>ff",
               action = function()
                 Snacks.picker.files()
               end,
@@ -32,14 +39,16 @@ return {
             {
               icon = " ",
               key = "n",
-              desc = "New File             :enew",
+              desc = "New File",
+              label = ":enew",
               action = ":ene | startinsert",
             },
             {
               icon = " ",
               key = "g",
               -- The whole reason this file exists.
-              desc = "Find Text            <leader>sg",
+              desc = "Find Text",
+              label = "<leader>sg",
               action = function()
                 Snacks.picker.grep(search.opts("code"))
               end,
@@ -47,7 +56,8 @@ return {
             {
               icon = " ",
               key = "r",
-              desc = "Recent Files         <leader>fr",
+              desc = "Recent Files",
+              label = "<leader>fr",
               action = function()
                 Snacks.picker.recent()
               end,
@@ -55,7 +65,8 @@ return {
             {
               icon = " ",
               key = "c",
-              desc = "Config               <leader>fc",
+              desc = "Config",
+              label = "<leader>fc",
               action = function()
                 Snacks.picker.files({ cwd = vim.fn.stdpath("config") })
               end,
@@ -63,13 +74,15 @@ return {
             {
               icon = " ",
               key = "s",
-              desc = "Restore Session      <leader>qs",
+              desc = "Restore Session",
+              label = "<leader>qs",
               section = "session",
             },
             {
               icon = " ",
               key = "?",
               desc = "What can this editor do",
+              label = "<leader>?",
               action = function()
                 require("util.capabilities").open()
               end,
@@ -77,7 +90,8 @@ return {
             {
               icon = "󰒲 ",
               key = "l",
-              desc = "Plugins              <leader>l",
+              desc = "Plugins",
+              label = "<leader>l",
               action = ":Lazy",
             },
             { icon = " ", key = "q", desc = "Quit", action = ":qa" },

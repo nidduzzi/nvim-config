@@ -211,8 +211,26 @@ function M.run()
   agent.ask(prompt, {
     schema = SCHEMA,
     label = "Reviewing " .. scope.name,
-    on_done = function(_, structured)
-      local findings = structured and structured.findings or {}
+    on_done = function(text, structured)
+      -- An answer that could not be read is not an answer of "nothing wrong".
+      --
+      -- Reported as one, it is the most dangerous message this can print: it
+      -- says the code is fine when nothing was checked. A backend with no
+      -- schema flag returns prose, and prose that fails to parse looked
+      -- exactly like a clean review — which is how `HTTP 401: Unauthorized`
+      -- spent an afternoon being read as "Nothing found in function".
+      if not structured or type(structured.findings) ~= "table" then
+        vim.notify(
+          ("Could not read the answer, so nothing was checked.\n\n%s"):format(
+            vim.trim(text or ""):sub(1, 300)
+          ),
+          vim.log.levels.ERROR,
+          { title = "Review failed" }
+        )
+        return
+      end
+
+      local findings = structured.findings
 
       if #findings == 0 then
         M.clear(ctx.bufnr)
