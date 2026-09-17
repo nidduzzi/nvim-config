@@ -28,6 +28,7 @@ local M = {}
 ---@type table<string, string>
 M.behaviour = {
   ["flash.nvim"] = "Jump to a label. f and t work as always, then every further match is labelled; Esc cancels",
+  ["Matchit"] = "Jump between matching keywords, not just brackets: if/end, opening and closing tags",
 }
 
 --- The scopes `<Tab>` cycles through, in order.
@@ -289,6 +290,28 @@ local function plain_description(map)
     return "run :" .. vim.trim(command)
   end
 
+  -- <Plug>(MatchitNormalForward) names its own plugin, which is the answer to
+  -- "what is % now". These are a third of what used to be dropped.
+  local plug = rhs:match("^<Plug>%((%a+)")
+  if plug then
+    -- The name runs the plugin and the action together —
+    -- <Plug>(MatchitNormalForward) — so match on the longest prefix that has
+    -- an entry rather than on the whole thing, which never matches.
+    for name, behaviour in pairs(M.behaviour) do
+      if plug:sub(1, #name) == name then
+        return ("%s — %s"):format(behaviour, name)
+      end
+    end
+    return ("no description given — %s"):format(plug)
+  end
+
+  -- Anything else with a right-hand side is keystrokes, and keystrokes are
+  -- readable: `>gv` is "indent, then reselect". Showing them beats dropping
+  -- the key, which is what happened to < and > in visual mode.
+  if rhs ~= "" then
+    return "sends " .. rhs
+  end
+
   -- Ask the callback where it came from. One line per plugin rather than one
   -- per key: a plugin that takes six keys in four modes is 24 mappings and a
   -- single entry here.
@@ -345,6 +368,13 @@ function M.keymaps()
     for _, map in ipairs(maps) do
       local lhs = pretty_key(map.lhs)
       local description = plain_description(map)
+
+      -- <Plug>(...) as a left-hand side is a target for other mappings, not a
+      -- key anyone types. Listing them is noise, and they are the only thing
+      -- deliberately left out.
+      if lhs:match("^<Plug>") then
+        description = ""
+      end
 
       if description ~= "" and not seen[mode .. lhs] then
         seen[mode .. lhs] = true
