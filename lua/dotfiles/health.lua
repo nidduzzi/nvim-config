@@ -74,8 +74,17 @@ function M.check()
         entry.after,
         entry.who
       )
-      -- Most of these are a plugin refining its own key, which is ordinary.
-      vim.health.info(line)
+
+      -- Three kinds, and only the last is a problem. A plugin refining its own
+      -- key is ordinary; this config taking a key is a decision already made;
+      -- a plugin taking a key this config owns is how a feature disappears.
+      if entry.mine then
+        vim.health.info(line .. "  (on purpose, by this config)")
+      elseif require("config.keyguard").watched[entry.mode .. entry.lhs] then
+        vim.health.warn(line .. "  (a key this config uses)")
+      else
+        vim.health.info(line)
+      end
     end
   end
 
