@@ -55,6 +55,16 @@ return {
     },
     keys = {
       {
+        -- Buffers, where the old configuration had them. LazyVim puts Find
+        -- Files here, but files already answer to <leader>ff and <leader>fF
+        -- while buffers had only <leader>, and the crowded <leader>f group.
+        "<leader><leader>",
+        function()
+          Snacks.picker.buffers()
+        end,
+        desc = "Buffers",
+      },
+      {
         "<leader>/",
         function()
           Snacks.picker.grep(search.opts("code"))
@@ -62,36 +72,16 @@ return {
         desc = "Grep (no docs)",
       },
       {
+        -- One grep, not three. Which files it searches is a decision made
+        -- while reading the results, not before opening the picker, so the
+        -- filter is a key inside it: <a-d> cycles code, everything and
+        -- documentation, <a-p> picks from the list. Three keys on a prefix
+        -- that already holds thirty-five bought nothing that <a-d> did not.
         "<leader>sg",
         function()
           Snacks.picker.grep(search.opts("code"))
         end,
-        desc = "Grep (no docs)",
-      },
-      {
-        "<leader>sG",
-        function()
-          Snacks.picker.grep(search.opts("all"))
-        end,
-        desc = "Grep (everything)",
-      },
-      {
-        -- Not <leader>sD: that is LazyVim's workspace diagnostics, and taking
-        -- it silently removed a feature that had nothing to do with grep.
-        "<leader>sO",
-        function()
-          Snacks.picker.grep(search.opts("docs"))
-        end,
-        desc = "Grep (docs only)",
-      },
-      {
-        -- Searching the editor itself, not the project. A feature used once a
-        -- month is otherwise a feature you have to remember a key for.
-        "<leader>sx",
-        function()
-          require("util.capabilities").open()
-        end,
-        desc = "Search what this editor can do",
+        desc = "Grep (a-d cycles the filter)",
       },
       {
         "<leader>sw",
