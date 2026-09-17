@@ -60,6 +60,25 @@ function M.check()
     end
   end
 
+  vim.health.start("dotfiles: keys that were overwritten")
+
+  local overwrites = require("config.keyguard").overwrites
+  if #overwrites == 0 then
+    vim.health.ok("Nothing has overwritten a mapping since startup.")
+  else
+    for _, entry in ipairs(overwrites) do
+      local line = ("%s (%s) was %q, now %q — %s"):format(
+        entry.lhs,
+        entry.mode,
+        entry.before,
+        entry.after,
+        entry.who
+      )
+      -- Most of these are a plugin refining its own key, which is ordinary.
+      vim.health.info(line)
+    end
+  end
+
   vim.health.start("dotfiles: installing servers")
   vim.health.info(table.concat({
     "Servers are never installed automatically, and how you install one is not",
