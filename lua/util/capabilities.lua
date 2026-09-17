@@ -553,7 +553,12 @@ function M.open(scope, order)
     format = function(item)
       local capability = item.capability
       local mark = { capability.kind == "feature" and "● " or "○ ", "SnacksPickerSpecial" }
-      local key = { ("%-18s"):format(capability.key or ""), "SnacksPickerSpecial" }
+      -- A blank key column reads as "you missed something" rather than "there
+      -- is no key for this", and the difference matters to someone learning
+      -- their way around. Six features are reachable only from here.
+      local key = capability.key and capability.key ~= ""
+          and { ("%-18s"):format(capability.key), "SnacksPickerSpecial" }
+        or { ("%-18s"):format("from here"), "SnacksPickerDimmed" }
       local name = { ("%-30s"):format(capability.name:sub(1, 30)), "SnacksPickerLabel" }
       local gap = { "  ", "SnacksPickerComment" }
       local desc = { capability.desc, "SnacksPickerComment" }
