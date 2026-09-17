@@ -132,6 +132,23 @@ M.baseline = { "lua_ls" }
 ---@type table<string, { status: "project"|"PATH"|"editor"|"missing", cmd?: string[], filetypes?: string[] }>
 M.status = {}
 
+--- Servers this project does not want, even though it provides them.
+---
+--- Set from a project's `.nvim.lua`:
+---
+---     vim.g.lsp_ignore = { "pyright" }
+---
+--- Python is where this bites: a virtualenv can easily hold pylsp, pyrefly,
+--- pyright, ruff and ty at once, and four of those will type-check the same
+--- file and disagree about how much to say. Which one a project trusts is the
+--- project's business, not this config's.
+---@param name string
+---@return boolean
+local function ignored(name)
+  local list = vim.g.lsp_ignore
+  return type(list) == "table" and vim.tbl_contains(list, name) or false
+end
+
 --- Disable every server the project cannot provide, and point the rest at the
 --- project's own executable when there is one.
 ---@param servers table<string, table|boolean>
@@ -144,6 +161,13 @@ function M.keep_available(servers)
     -- "*" is not a server. LazyVim uses it to hold the settings applied to
     -- every server, so disabling it would disable the lot.
     if name == "*" or settings.enabled == false then
+      goto continue
+    end
+
+    if ignored(name) then
+      settings.enabled = false
+      servers[name] = settings
+      M.status[name] = { status = "ignored", filetypes = (vim.lsp.config[name] or {}).filetypes }
       goto continue
     end
 

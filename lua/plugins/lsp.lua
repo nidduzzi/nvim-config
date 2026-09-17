@@ -52,6 +52,10 @@ return {
           end,
         },
 
+        -- ty: Astral's Python type checker. Like the others, it starts only
+        -- where the project provides it.
+        ty = {},
+
         lua_ls = {
           settings = {
             Lua = {
