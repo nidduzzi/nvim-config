@@ -97,21 +97,17 @@ end, { desc = "What this editor can do" })
 --
 -- Which agent answers is a setting. Claude Code is the default because it is
 -- the one whose lockdown has been proven here; see util/agent/backends.lua.
-map("n", "<leader>ar", function()
-  require("util.agent.review").here()
-end, { desc = "Review this function, as diagnostics" })
+map({ "n", "x" }, "<leader>ar", function()
+  require("util.agent.review").run()
+end, { desc = "Review this code, as diagnostics" })
 
-map("x", "<leader>ar", function()
-  require("util.agent.review").here()
-end, { desc = "Review the selection, as diagnostics" })
+map("n", "<leader>af", function()
+  require("util.agent.review").open()
+end, { desc = "List the review findings" })
 
-map("n", "<leader>aR", function()
-  require("util.agent.review").buffer()
-end, { desc = "Review the whole file, as diagnostics" })
-
-map("n", "<leader>ag", function()
-  require("util.agent.review").changes()
-end, { desc = "Review only what I changed" })
+map("n", "<leader>as", function()
+  require("util.agent.review").choose_scope()
+end, { desc = "Review something wider or narrower" })
 
 map("n", "<leader>ac", function()
   require("util.agent.review").clear()

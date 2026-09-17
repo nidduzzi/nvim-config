@@ -19,6 +19,7 @@
 local agent = require("util.agent")
 local context = require("util.agent.context")
 local panel = require("util.agent.panel")
+local recall = require("util.recall")
 
 local M = {}
 
@@ -63,7 +64,9 @@ function M.lookup(query)
   if query then
     run(query)
   else
-    vim.ui.input({ prompt = "Look up: " }, run)
+    -- Look-ups repeat far more than questions do: the same signature gets
+    -- forgotten twice a week. Offering the last ones back is most of the value.
+    recall.input({ kind = "lookup", prompt = "Look up" }, run)
   end
 end
 
@@ -129,7 +132,7 @@ function M.ask(question)
   if question then
     run(question)
   else
-    vim.ui.input({ prompt = "Ask about this code: " }, run)
+    recall.input({ kind = "ask", prompt = "Ask about this code" }, run)
   end
 end
 

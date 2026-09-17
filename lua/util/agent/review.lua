@@ -1,13 +1,21 @@
 --- Review, delivered as diagnostics rather than as a patch.
 ---
---- This is the whole point of the integration. A review that arrives as prose
---- gets skimmed; a review that arrives as a diff gets accepted. A review that
+--- This is the point of the integration. A review that arrives as prose gets
+--- skimmed; a review that arrives as a diff gets accepted. A review that
 --- arrives as diagnostics has to be navigated with ]d and fixed by typing,
---- which is the same motion as fixing anything the LSP found, so the findings
---- land in a habit that already exists.
+--- which is the same motion as fixing anything the language server found, so
+--- the findings land in a habit that already exists.
 ---
---- The agent never sees your fix unless you ask again. Re-running is how you check
---- yourself, and a finding that disappears is one you actually resolved.
+--- They also open in a picker, because diagnostics answer "what is wrong on
+--- this line" and not "what is wrong overall", and because a review that spans
+--- files has nowhere to put itself in a single buffer.
+---
+--- One key, with the scope switched inside it rather than one key per scope —
+--- the same shape as the grep filter, so there is one idiom to learn instead
+--- of two.
+---
+--- The agent never sees your fix unless you ask again. Re-running is how you
+--- check yourself, and a finding that disappears is one you resolved.
 
 local agent = require("util.agent")
 local context = require("util.agent.context")
@@ -15,6 +23,56 @@ local context = require("util.agent.context")
 local M = {}
 
 M.namespace = vim.api.nvim_create_namespace("agent-review")
+
+--- What to look at. Ordered from tightest to widest, because `<a-s>` walks
+--- them and widening is the usual direction when the narrow answer is thin.
+---@type { name: string, desc: string, gather: fun(): agent.Context|nil, instruction: string }[]
+M.scopes = {
+  {
+    name = "function",
+    desc = "the function the cursor is in, or the selection",
+    instruction = "Review this code for defects.",
+    gather = function()
+      return context.here()
+    end,
+  },
+  {
+    name = "file",
+    desc = "the whole buffer",
+    instruction = "Review this source for defects.",
+    gather = function()
+      return context.buffer()
+    end,
+  },
+  {
+    name = "changes",
+    desc = "only the lines you have changed",
+    instruction = "Review only the lines this diff changes. Ignore defects in code it does not touch.",
+    gather = function()
+      local file = vim.fn.expand("%:p")
+      if file == "" then
+        vim.notify("This buffer is not a file.", vim.log.levels.WARN, { title = "Review" })
+        return nil
+      end
+
+      local diff = vim.system({ "git", "diff", "-U10", "--", file }, { cwd = agent.root(), text = true }):wait()
+      if diff.code ~= 0 or vim.trim(diff.stdout or "") == "" then
+        vim.notify("No unstaged changes to this file.", vim.log.levels.INFO, { title = "Review" })
+        return nil
+      end
+
+      -- The buffer goes too, so a finding can be placed on a real line; the
+      -- diff only says which lines are worth looking at.
+      local ctx = context.buffer()
+      return {
+        text = ("%s\n\nAnd the change under review, as a diff:\n%s"):format(ctx.text, diff.stdout),
+        first = 1,
+        name = ctx.name,
+        bufnr = ctx.bufnr,
+      }
+    end,
+  },
+}
 
 --- Findings, constrained so that what comes back can be placed in a buffer
 --- without parsing prose. The schema is what stops the answer being an essay.
@@ -44,18 +102,98 @@ local LEVELS = {
   info = vim.diagnostic.severity.INFO,
 }
 
+--- The scope in force, remembered so that `<leader>ar` twice in a row means
+--- the same thing twice in a row.
+local current = 1
+
+--- The last review's findings, so the picker can be reopened without paying
+--- for the answer again.
+---@type table[]
+M.last = {}
+
 --- Clear what the last review left behind.
 ---@param bufnr? integer
 function M.clear(bufnr)
   vim.diagnostic.reset(M.namespace, bufnr or 0)
+  M.last = {}
 end
 
----@param ctx agent.Context
----@param instruction string
----@param label string
-local function run(ctx, instruction, label)
+---@return string
+local function scope_line()
+  local parts = {}
+  for i, scope in ipairs(M.scopes) do
+    table.insert(parts, i == current and ("[" .. scope.name .. "]") or scope.name)
+  end
+  return table.concat(parts, "  ")
+end
+
+--- Show the findings in a picker: fuzzy over the messages, preview of the
+--- line, enter to go there. `<a-s>` cycles the scope and reviews again.
+function M.open()
+  if #M.last == 0 then
+    vim.notify("No findings. <leader>ar reviews.", vim.log.levels.INFO, { title = "Review" })
+    return
+  end
+
+  local items = {}
+  for i, finding in ipairs(M.last) do
+    table.insert(items, {
+      idx = i,
+      score = 0,
+      text = finding.message,
+      file = finding.file,
+      pos = { finding.lnum + 1, 0 },
+      severity = finding.severity,
+      message = finding.message,
+    })
+  end
+
+  Snacks.picker.pick({
+    title = "Findings — " .. scope_line(),
+    items = items,
+    format = function(item)
+      local marks = {
+        vim.diagnostic.severity.ERROR,
+        vim.diagnostic.severity.WARN,
+        vim.diagnostic.severity.INFO,
+      }
+      local highlight = "DiagnosticInfo"
+      for _, level in ipairs(marks) do
+        if item.severity == level then
+          highlight = "Diagnostic" .. vim.diagnostic.severity[level]:sub(1, 1) .. vim.diagnostic.severity[level]:sub(2):lower()
+        end
+      end
+      return {
+        { ("%4d  "):format(item.pos[1]), "SnacksPickerIdx" },
+        { item.message, highlight },
+      }
+    end,
+    actions = {
+      cycle_scope = function(picker)
+        picker:close()
+        M.next_scope()
+      end,
+    },
+    win = {
+      input = {
+        keys = {
+          ["<a-s>"] = { "cycle_scope", mode = { "i", "n" }, desc = "Review the next scope out" },
+        },
+      },
+    },
+  })
+end
+
+--- Review at the current scope.
+function M.run()
+  local scope = M.scopes[current]
+  local ctx = scope.gather()
+  if not ctx then
+    return
+  end
+
   local prompt = table.concat({
-    instruction,
+    scope.instruction,
     "",
     "Report only defects you can point at: a wrong result, a crash, a case that",
     "is not handled, a resource that leaks. Do not report style, naming or",
@@ -72,82 +210,67 @@ local function run(ctx, instruction, label)
 
   agent.ask(prompt, {
     schema = SCHEMA,
-    label = label,
+    label = "Reviewing " .. scope.name,
     on_done = function(_, structured)
       local findings = structured and structured.findings or {}
 
       if #findings == 0 then
         M.clear(ctx.bufnr)
-        vim.notify("Nothing found.", vim.log.levels.INFO, { title = "Review" })
+        vim.notify(
+          ("Nothing found in %s. <a-s> from the findings list widens the scope."):format(scope.name),
+          vim.log.levels.INFO,
+          { title = "Review" }
+        )
         return
       end
 
-      local last = vim.api.nvim_buf_line_count(ctx.bufnr)
+      local last_line = vim.api.nvim_buf_line_count(ctx.bufnr)
+      local file = vim.api.nvim_buf_get_name(ctx.bufnr)
       local items = {}
+
       for _, f in ipairs(findings) do
-        -- A line outside the buffer would throw away the finding entirely, so
+        -- A line outside the buffer would throw the finding away entirely, so
         -- clamp it and keep the message.
-        local lnum = math.max(1, math.min(tonumber(f.line) or 1, last))
+        local lnum = math.max(1, math.min(tonumber(f.line) or 1, last_line))
         table.insert(items, {
           bufnr = ctx.bufnr,
+          file = file,
           lnum = lnum - 1,
           col = 0,
           severity = LEVELS[f.severity] or vim.diagnostic.severity.INFO,
           message = f.message,
-          -- Name the agent, so a finding is attributable when two of them
-          -- disagree and so it never looks like the language server's.
-          source = require("util.agent.backends")[require("util.agent").config.backend].label,
+          source = require("util.agent.backends")[agent.config.backend].label,
         })
       end
 
       vim.diagnostic.set(M.namespace, ctx.bufnr, items)
-      vim.notify(
-        ("%d finding%s. ]d walks them."):format(#items, #items == 1 and "" or "s"),
-        vim.log.levels.INFO,
-        { title = "Review" }
-      )
+      M.last = items
+      M.open()
     end,
   })
 end
 
---- Review the whole buffer.
-function M.buffer()
-  run(context.buffer(), "Review this source for defects.", "Reviewing the buffer")
+--- Move to the next scope out and review again.
+function M.next_scope()
+  current = (current % #M.scopes) + 1
+  local scope = M.scopes[current]
+  vim.notify(scope.name .. ": " .. scope.desc, vim.log.levels.INFO, { title = "Review scope" })
+  M.run()
 end
 
---- Review the selection, or the function the cursor is in.
-function M.here()
-  run(context.here(), "Review this code for defects.", "Reviewing")
-end
-
---- Review only what you have changed, which is the version worth running often:
---- it asks about your work rather than about the file's history.
-function M.changes()
-  local file = vim.fn.expand("%:p")
-  if file == "" then
-    vim.notify("This buffer is not a file.", vim.log.levels.WARN, { title = "Review" })
-    return
+--- Choose a scope by name rather than walking to it.
+function M.choose_scope()
+  local labels = {}
+  for _, scope in ipairs(M.scopes) do
+    table.insert(labels, ("%-9s %s"):format(scope.name, scope.desc))
   end
 
-  local diff = vim.system({ "git", "diff", "-U10", "--", file }, { cwd = agent.root(), text = true }):wait()
-  if diff.code ~= 0 or vim.trim(diff.stdout or "") == "" then
-    vim.notify("No unstaged changes to this file.", vim.log.levels.INFO, { title = "Review" })
-    return
-  end
-
-  -- The diff carries its own line numbers in the hunk headers, so the buffer is
-  -- sent as well and the diff is described as the part to concentrate on.
-  local ctx = context.buffer()
-  run(
-    {
-      text = ("%s\n\nAnd the change under review, as a diff:\n%s"):format(ctx.text, diff.stdout),
-      first = 1,
-      name = ctx.name,
-      bufnr = ctx.bufnr,
-    },
-    "Review only the lines this diff changes. Ignore defects in code it does not touch.",
-    "Reviewing your changes"
-  )
+  vim.ui.select(labels, { prompt = "Review scope" }, function(_, index)
+    if index then
+      current = index
+      M.run()
+    end
+  end)
 end
 
 return M

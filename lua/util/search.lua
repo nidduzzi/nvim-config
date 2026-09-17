@@ -154,7 +154,14 @@ end
 --- Limit the search to one or more file extensions. Bound to `<a-e>`.
 ---@param picker table
 function M.by_extension(picker)
-  vim.ui.input({ prompt = "Extensions (comma separated, e.g. lua,ts): " }, function(input)
+  -- Offer the extensions this project actually contains. Recalling that a
+  -- repository is .ts and not .js is not work worth doing from memory.
+  local recall = require("util.recall")
+  recall.input({
+    kind = "extensions",
+    prompt = "Extensions (comma separated)",
+    suggestions = recall.extensions(),
+  }, function(input)
     if not input or input == "" then
       return
     end
@@ -175,7 +182,12 @@ end
 --- Limit the search to an arbitrary path glob. Bound to `<a-G>`.
 ---@param picker table
 function M.by_glob(picker)
-  vim.ui.input({ prompt = "Path glob (prefix with ! to exclude): " }, function(input)
+  local recall = require("util.recall")
+  recall.input({
+    kind = "glob",
+    prompt = "Path glob (! excludes)",
+    suggestions = recall.top_level_globs(),
+  }, function(input)
     if not input or input == "" then
       return
     end

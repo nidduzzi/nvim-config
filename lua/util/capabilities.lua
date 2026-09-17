@@ -6,16 +6,32 @@
 --- is one picker over both rather than two of them competing for a key.
 ---
 --- `<Tab>` switches scope the way tabs would: everything, the configuration's
---- own features, or this buffer's keymaps. which-key keeps its job — its
---- popup, which groups keys by prefix, is one of the entries, and `<leader>sk`
---- still lists every keymap in the editor.
+--- own features, the keymaps, or the editor's own Ex commands. which-key keeps
+--- its job — its popup, which groups keys by prefix, is one of the entries, and
+--- `<leader>sk` still lists every keymap in the editor.
+---
+--- The commands scope exists because `:tabclose` is not guessable. Vim's
+--- commands are a vocabulary you either know or do not, `:help` answers only
+--- when you already have the word, and tab completion after `:` needs the
+--- first letters. Fuzzy matching over the whole list turns "close" into a
+--- short list containing the one you meant.
 
 local M = {}
 
 ---@alias capability { name: string, desc: string, key?: string, kind: string, run: fun() }
 
+--- What a plugin's undescribed keys actually do.
+---
+--- The only hand-written part, and deliberately the smallest one: a line per
+--- plugin, added when `check-keymaps.sh` reports a new name under "single keys
+--- a plugin took over". Everything else about the list is derived.
+---@type table<string, string>
+M.behaviour = {
+  ["flash.nvim"] = "Jump to a label. f and t work as always, then every further match is labelled; Esc cancels",
+}
+
 --- The scopes `<Tab>` cycles through, in order.
-M.scopes = { "everything", "features", "keymaps" }
+M.scopes = { "everything", "features", "keymaps", "commands" }
 
 --- How the list is ordered, which is really which question is being asked.
 ---
@@ -239,9 +255,18 @@ end
 --- A mapping's own description is written for a person, so prefer it. What is
 --- left is machinery: a Lua callback prints as `<Lua function 42>` and a right
 --- hand side prints as keystrokes, neither of which answers "what does this
---- key do". Commands can be read back into a sentence; anything else is better
---- left out of a list meant to be read.
----@param map table a keymap from nvim_buf_get_keymap
+--- key do". Commands can be read back into a sentence.
+---
+--- A callback with no description used to be dropped, which is how flash.nvim
+--- taking f, F, t, T, `;` and `,` left the editor unable to say what `t` did.
+--- Now the callback is asked where it came from: debug.getinfo gives its
+--- source file and `/lazy/<plugin>/` gives the owner. Measured over every
+--- mapping in a loaded editor, that is 586 with a description, 43 readable
+--- from their right-hand side and 24 attributed this way — and nothing left
+--- over. Naming the plugin is not a description, but it is the difference
+--- between a key you can look up and a key that does not exist as far as this
+--- editor is concerned.
+---@param map table a keymap from nvim_get_keymap or nvim_buf_get_keymap
 ---@return string
 local function plain_description(map)
   local description = map.desc or ""
@@ -264,39 +289,133 @@ local function plain_description(map)
     return "run :" .. vim.trim(command)
   end
 
-  -- A Lua callback with no description tells the reader nothing a function
-  -- name would not obscure further.
+  -- Ask the callback where it came from. One line per plugin rather than one
+  -- per key: a plugin that takes six keys in four modes is 24 mappings and a
+  -- single entry here.
+  if map.callback then
+    local ok, info = pcall(debug.getinfo, map.callback, "S")
+    if ok and info then
+      local source = (info.source or ""):gsub("^@", "")
+      local plugin = source:match("/lazy/([^/]+)/")
+      if plugin then
+        return ("%s — %s"):format(M.behaviour[plugin] or "no description given", plugin)
+      end
+
+      -- This configuration's own callbacks. Anything reaching here is a
+      -- mapping we wrote and forgot to describe, which is worth seeing.
+      local ours = source:match("/lua/(.-)%.lua$")
+      if ours then
+        return ("no description given — %s"):format((ours:gsub("/", ".")))
+      end
+    end
+  end
+
   return ""
 end
 
---- The keys bound in this buffer: what `<leader>?` showed before.
+--- Write a key the way the documentation writes it.
+---
+--- keytrans escapes a literal `<` to `<lt>`, so `<Tab>` comes back as
+--- `<lt>Tab>` and `<leader><Tab>]` renders as `<Space><lt>Tab>]`. Searching
+--- the list for "Tab" then matches the description and not the key, which is
+--- how the tab mappings looked missing even once they were being collected.
+---@param lhs string
+---@return string
+local function pretty_key(lhs)
+  local key = vim.fn.keytrans(lhs or "")
+  key = key:gsub("<lt>", "<")
+  -- The leader is a space in this configuration, and `<Space>gd` reads as two
+  -- keys rather than as the mapping people actually think of.
+  key = key:gsub("^<Space>", "<leader>")
+  return key
+end
+
+--- The keys bound here: what `<leader>?` showed before.
+---
+--- Both scopes, and buffer-local first. Only collecting buffer-local mappings
+--- was wrong in a way that was invisible from the inside: every tab mapping —
+--- `<leader><Tab>]`, `<leader><Tab>d` and the rest — is global, so searching
+--- this list for "tab" found nothing at all and the feature looked unbound.
 ---@return capability[]
 function M.keymaps()
   local items = {}
   local seen = {}
 
-  for _, mode in ipairs({ "n", "x", "i" }) do
-    for _, map in ipairs(vim.api.nvim_buf_get_keymap(0, mode)) do
-      local lhs = vim.fn.keytrans(map.lhs or "")
+  local function collect(maps, mode, where)
+    for _, map in ipairs(maps) do
+      local lhs = pretty_key(map.lhs)
       local description = plain_description(map)
 
       if description ~= "" and not seen[mode .. lhs] then
         seen[mode .. lhs] = true
         table.insert(items, {
           name = description,
-          desc = "buffer mapping, " .. mode .. " mode",
+          desc = where .. ", " .. mode .. " mode",
           key = lhs,
           kind = "keymap",
           run = function()
-            vim.api.nvim_feedkeys(vim.keycode(lhs), mode, false)
+            vim.api.nvim_feedkeys(vim.keycode(map.lhs), mode, false)
           end,
         })
       end
     end
   end
 
+  for _, mode in ipairs({ "n", "x", "i" }) do
+    -- Buffer-local first, so a mapping this buffer overrides is described by
+    -- what it actually does here.
+    collect(vim.api.nvim_buf_get_keymap(0, mode), mode, "this buffer")
+    collect(vim.api.nvim_get_keymap(mode), mode, "everywhere")
+  end
+
   table.sort(items, function(a, b)
     return a.key < b.key
+  end)
+
+  return items
+end
+
+--- The editor's own Ex commands, so `:tabclose` is findable by typing "close".
+---
+--- Built-in commands carry no description anywhere Neovim will tell us about,
+--- so the name is all there is for them; commands defined by plugins and by
+--- this configuration do have one, and it is used. Choosing one opens the
+--- command line with it rather than running it, because plenty of them take
+--- arguments and running `:tabonly` by accident is a bad first impression.
+---@return capability[]
+function M.commands()
+  local items = {}
+  local seen = {}
+
+  for name, command in pairs(vim.api.nvim_get_commands({})) do
+    seen[name] = true
+    table.insert(items, {
+      name = ":" .. name,
+      desc = (type(command) == "table" and command.definition) and tostring(command.definition):sub(1, 120) or "editor command",
+      kind = "command",
+      run = function()
+        vim.api.nvim_feedkeys(":" .. name .. " ", "n", false)
+      end,
+    })
+  end
+
+  -- getcompletion answers with the built-ins too, which nvim_get_commands does
+  -- not: :tabclose lives here and not above.
+  for _, name in ipairs(vim.fn.getcompletion("", "command")) do
+    if not seen[name] and name:match("^%a") then
+      table.insert(items, {
+        name = ":" .. name,
+        desc = "built-in command",
+        kind = "command",
+        run = function()
+          vim.api.nvim_feedkeys(":" .. name .. " ", "n", false)
+        end,
+      })
+    end
+  end
+
+  table.sort(items, function(a, b)
+    return a.name < b.name
   end)
 
   return items
@@ -311,9 +430,13 @@ function M.items(scope)
   if scope == "keymaps" then
     return M.keymaps()
   end
+  if scope == "commands" then
+    return M.commands()
+  end
 
   local all = M.features()
   vim.list_extend(all, M.keymaps())
+  vim.list_extend(all, M.commands())
   return all
 end
 
