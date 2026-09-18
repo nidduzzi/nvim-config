@@ -24,6 +24,51 @@ local M = {}
 
 M.namespace = vim.api.nvim_create_namespace("agent-review")
 
+-- A finding is a sentence, not a compiler's one-liner, and every place that
+-- shows one by default cuts it off: virtual text ends at the window edge, and
+-- the picker's list column is about half a screen wide. Virtual lines put the
+-- whole message under the line it is about, wrapped, for the line the cursor
+-- is on — so reading a finding in full is "move to it" rather than "find the
+-- key that reveals the rest of it".
+--
+-- Scoped to this namespace, so it applies to the agent's findings and leaves
+-- the language server's diagnostics rendering as they were.
+--- Break a sentence into lines that fit, on word boundaries.
+---@param text string
+---@param width integer
+---@return string
+local function wrapped(text, width)
+  local lines, line = {}, ""
+  for word in text:gmatch("%S+") do
+    if line == "" then
+      line = word
+    elseif #line + 1 + #word <= width then
+      line = line .. " " .. word
+    else
+      table.insert(lines, line)
+      line = word
+    end
+  end
+  if line ~= "" then
+    table.insert(lines, line)
+  end
+  return table.concat(lines, "\n")
+end
+
+vim.diagnostic.config({
+  virtual_text = false,
+  virtual_lines = {
+    current_line = true,
+    -- Virtual lines do not wrap: a line longer than the window simply ends at
+    -- its edge, which is the same clipping in a different place. Wrapping the
+    -- message here turns one over-long virtual line into several that fit. The
+    -- margin covers the tree glyphs virtual lines indent themselves by.
+    format = function(diagnostic)
+      return wrapped(diagnostic.message, math.max(40, vim.api.nvim_win_get_width(0) - 20))
+    end,
+  },
+}, M.namespace)
+
 --- What to look at. Ordered from tightest to widest, because `<a-s>` walks
 --- them and widening is the usual direction when the narrow answer is thin.
 ---@type { name: string, desc: string, gather: fun(): agent.Context|nil, instruction: string }[]
