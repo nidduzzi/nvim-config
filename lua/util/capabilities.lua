@@ -54,6 +54,36 @@ function M.features()
 
   return {
     {
+      -- Getting into a popup is the half nobody documents. Both of these open
+      -- unfocused and focus on a second press, which is Neovim's own
+      -- behaviour and is written down nowhere anyone looks.
+      name = "Read a hover popup, and scroll it",
+      desc = "K opens it. K again moves the cursor inside, so you can scroll and select. c-c leaves",
+      key = "K  K",
+      kind = "feature",
+      run = function()
+        vim.lsp.buf.hover()
+      end,
+    },
+    {
+      name = "Read the diagnostic under the cursor",
+      desc = "Same twice-to-enter: <leader>cd opens it, again moves inside, c-c leaves",
+      key = "<leader>cd  <leader>cd",
+      kind = "feature",
+      run = function()
+        vim.diagnostic.open_float()
+      end,
+    },
+    {
+      name = "Close whatever is open",
+      desc = "c-c returns to normal from every popup, picker, list and split. In a terminal it interrupts the program instead, and a-q closes that",
+      key = "<c-c>",
+      kind = "feature",
+      run = function()
+        require("util.dismiss").dismiss()
+      end,
+    },
+    {
       name = "Grep, without documentation",
       desc = "Search file contents, skipping the project's prose",
       key = "<leader>sg",

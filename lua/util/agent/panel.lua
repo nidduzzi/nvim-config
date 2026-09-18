@@ -63,8 +63,11 @@ function M.show(title, text, opts)
     border = "rounded",
     title = " " .. title .. " ",
     title_pos = "left",
-    footer = opts.footer and (" " .. opts.footer .. " ") or nil,
-    footer_pos = opts.footer and "right" or nil,
+    -- The footer always carries the close key, whatever else it says. An
+    -- overlay that does not tell you how to leave it is the thing this
+    -- configuration keeps getting wrong.
+    footer = (" %s "):format(opts.footer and (opts.footer .. "  ·  a-q closes") or "a-q closes"),
+    footer_pos = "right",
   })
 
   vim.wo[win].wrap = true

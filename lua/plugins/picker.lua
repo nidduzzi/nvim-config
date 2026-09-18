@@ -62,6 +62,7 @@ return {
               -- It is bound here only because the built-in `?` is normal-mode
               -- and the picker opens in insert, so nobody ever reaches it.
               ["<a-/>"] = { "toggle_help_input", mode = { "i", "n" }, desc = "What can I press in here" },
+              ["<a-q>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
               ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
             },
           },

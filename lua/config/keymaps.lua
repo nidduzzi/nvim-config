@@ -7,6 +7,11 @@
 
 local map = vim.keymap.set
 
+-- One key that closes whatever is open, because the set of close keys is not
+-- learnable: q in Trouble and Lazy, <Esc> in a picker's list but not its
+-- input, the opening key in some places, :q in others. See util/dismiss.lua.
+require("util.dismiss").setup()
+
 -- Clear the search highlight without typing a command.
 map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 
