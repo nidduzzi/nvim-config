@@ -283,6 +283,18 @@ function M.report()
   )
 end
 
+--- Whether a request is in flight.
+---
+--- Exists for anything that has to wait for the answer rather than guess how
+--- long it takes. The tour recorder used a fixed pause, which is wrong in both
+--- directions: a local 35B answered a hint in 151 seconds against a 150 second
+--- pause, so the film recorded an empty screen, and every faster answer than
+--- that sat idle for the remainder.
+---@return boolean
+function M.is_running()
+  return running ~= nil
+end
+
 --- Stop whatever is in flight.
 function M.cancel()
   if running then

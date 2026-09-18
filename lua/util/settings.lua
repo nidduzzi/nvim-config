@@ -29,8 +29,8 @@ M.defaults = {
   -- Which coding agent answers. See util/agent/backends.lua.
   agent_backend = "claude",
   -- nil means "whatever that backend prefers" — "sonnet" means nothing to
-  -- Hermes, so naming a model globally is wrong.
-  agent_model = nil,
+  -- Hermes, so naming a model globally is wrong. It is absent from this table
+  -- rather than false, so M.names below is what makes it visible.
   -- Use a backend whose inability to write has not been demonstrated here.
   agent_allow_unproven = false,
   -- Milliseconds before a request is abandoned. A local model needs far more
@@ -42,6 +42,19 @@ M.defaults = {
 
   -- Language servers this project should not start even if they are present.
   lsp_ignore = {},
+}
+
+--- Every settable name, including the ones whose default is nil and so cannot
+--- appear in the table above. A setting you cannot see listed is a setting you
+--- do not know you can set.
+---@type string[]
+M.names = {
+  "agent_backend",
+  "agent_model",
+  "agent_allow_unproven",
+  "agent_timeout",
+  "search_preset",
+  "lsp_ignore",
 }
 
 --- Set for this session only. Nothing is written to disk.
@@ -139,12 +152,17 @@ end
 --- `:checkhealth dotfiles` and by the capability list.
 ---@return { name: string, value: any, source: string }[]
 function M.all()
-  local names = vim.tbl_keys(M.defaults)
+  local names = vim.list_slice(M.names)
   table.sort(names)
 
   local rows = {}
   for _, name in ipairs(names) do
     local value, source = M.resolve(name)
+    if value == nil then
+      -- No tier set it, so there is no value to show and "built in" would be
+      -- a claim about a default that does not exist.
+      value, source = "(unset)", "the backend decides"
+    end
     table.insert(rows, { name = name, value = value, source = source })
   end
   return rows
@@ -153,12 +171,25 @@ end
 --- Show them, with where each one came from.
 function M.show()
   local lines = { "Settings, and where each value came from:", "" }
-  for _, row in ipairs(M.all()) do
+
+  -- Column widths from the values actually present. A fixed 28-wide value
+  -- column pushed "set for this session" past the panel's edge and wrapped
+  -- the tier onto its own line, which is the one thing this panel exists to
+  -- say clearly.
+  local rows = M.all()
+  local widest_name, widest_value = 0, 0
+  for _, row in ipairs(rows) do
     local value = row.value
     if type(value) == "table" then
       value = vim.inspect(value):gsub("%s+", " ")
     end
-    table.insert(lines, ("%-22s %-28s %s"):format(row.name, tostring(value):sub(1, 28), row.source))
+    row.shown = tostring(value)
+    widest_name = math.max(widest_name, #row.name)
+    widest_value = math.max(widest_value, #row.shown)
+  end
+
+  for _, row in ipairs(rows) do
+    table.insert(lines, ("%-" .. widest_name .. "s  %-" .. widest_value .. "s  %s"):format(row.name, row.shown, row.source))
   end
   table.insert(lines, "")
   table.insert(lines, ("Machine-local file: %s"):format(vim.fn.fnamemodify(M.local_file(), ":~")))
