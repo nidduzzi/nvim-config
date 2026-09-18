@@ -18,6 +18,26 @@ return {
     "folke/snacks.nvim",
     opts = {
       picker = {
+        -- Per source, because the explorer sets its own list keys and they win
+        -- over the shared ones. It binds <c-c> to tcd, which changes the tab's
+        -- working directory: pressing it to leave the explorer moved the whole
+        -- tab somewhere else and left the explorer open, and the only sign was
+        -- the item count dropping from 21 to 12.
+        --
+        -- tcd is still reachable on <c-w>, which the explorer already binds to
+        -- it, so nothing is lost.
+        sources = {
+          explorer = {
+            win = {
+              list = {
+                keys = {
+                  ["<c-c>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
+                },
+              },
+            },
+          },
+        },
+
         -- How results are ranked.
         --
         -- frecency and the cwd bonus are both off by default, so a file you
@@ -48,6 +68,11 @@ return {
           regex = { icon = "R", value = false },
         },
         win = {
+          list = {
+            keys = {
+              ["<c-c>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
+            },
+          },
           input = {
             keys = {
               -- Not <a-d> or <a-p>: those are snacks' own inspect and
@@ -63,6 +88,11 @@ return {
               -- and the picker opens in insert, so nobody ever reaches it.
               ["<a-/>"] = { "toggle_help_input", mode = { "i", "n" }, desc = "What can I press in here" },
               ["<a-q>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
+              -- snacks binds <c-c> in the list to tcd, which changes the tab's
+              -- directory. Pressing it to leave the explorer silently moved
+              -- the whole tab somewhere else and left the explorer open — the
+              -- item count changing from 21 to 12 was the only sign.
+              ["<c-c>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
               ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
             },
           },

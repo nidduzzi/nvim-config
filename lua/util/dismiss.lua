@@ -92,8 +92,19 @@ function M.dismiss()
     return true
   end
 
-  -- Then any floating window: hover, signature help, this configuration's own
-  -- answer panel, Lazy, a notification history.
+  -- The float you are in, before any other. Closing "the topmost" float is
+  -- wrong the moment the cursor is inside one that is not topmost — pressing
+  -- the key inside a focused hover closed a different window and left the
+  -- hover exactly where it was.
+  local here = vim.api.nvim_get_current_win()
+  local config = vim.api.nvim_win_get_config(here)
+  if config.relative and config.relative ~= "" then
+    pcall(vim.api.nvim_win_close, here, true)
+    return true
+  end
+
+  -- Otherwise the topmost float: hover, signature help, this configuration's
+  -- own answer panel, Lazy, a notification history.
   local floating = floats()
   if #floating > 0 then
     pcall(vim.api.nvim_win_close, floating[1], true)
