@@ -147,6 +147,10 @@ map("n", "<leader>au", function()
   require("util.agent").use()
 end, { desc = "Switch which agent answers" })
 
+map("n", "<leader>a?", function()
+  require("util.settings").show()
+end, { desc = "Which settings are in force, and from where" })
+
 map("n", "<leader>aq", function()
   require("util.agent").cancel()
 end, { desc = "Stop the request in flight" })

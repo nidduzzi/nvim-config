@@ -18,19 +18,27 @@ local backends = require("util.agent.backends")
 
 local M = {}
 
----@class agent.Config
----@field backend string
----@field model string|nil overrides the backend's own default
----@field timeout integer milliseconds
----@field allow_unproven boolean use a backend whose lockdown is not verified
-M.config = {
-  backend = "claude",
-  -- nil means "whatever this backend prefers", which is the right default once
-  -- more than one agent can answer: "sonnet" means nothing to Hermes.
-  model = nil,
-  timeout = 90000,
-  allow_unproven = false,
-}
+--- Which agent answers, and how, read through the settings tiers rather than
+--- held here. Choosing a backend used to last until you quit, and a project
+--- had no way to say "this one uses the local model".
+---
+---   agent_backend          claude, hermes, codex
+---   agent_model            nil means whatever that backend prefers
+---   agent_timeout          milliseconds; a local model needs far more
+---   agent_allow_unproven   use one not shown to be unable to write
+---
+--- Set any of them in a project's .nvim.lua as vim.g.agent_backend, in
+--- <config>/local.lua for this machine, or with <leader>au for right now.
+M.config = setmetatable({}, {
+  __index = function(_, key)
+    return require("util.settings").get("agent_" .. key)
+  end,
+  -- Assigning still works and means "for this session", which is what anything
+  -- already doing `config.backend = "hermes"` meant.
+  __newindex = function(_, key, value)
+    require("util.settings").set("agent_" .. key, value)
+  end,
+})
 
 --- The job in flight, so a second request replaces the first rather than
 --- racing it.

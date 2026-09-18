@@ -467,7 +467,9 @@ end
 ---@param name string
 ---@return table
 function M.opts(name)
-  local preset = M.preset(name) or M.presets()[1]
+  -- nil means "whatever this project or machine says", which is how a project
+  -- of mostly prose can start its searches on `all` instead of `code`.
+  local preset = M.preset(name or require("util.settings").get("search_preset")) or M.presets()[1]
   M.begin_pass()
   return {
     args = preset.args,

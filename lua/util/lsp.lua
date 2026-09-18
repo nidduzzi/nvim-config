@@ -145,7 +145,7 @@ M.status = {}
 ---@param name string
 ---@return boolean
 local function ignored(name)
-  local list = vim.g.lsp_ignore
+  local list = require("util.settings").get("lsp_ignore")
   return type(list) == "table" and vim.tbl_contains(list, name) or false
 end
 

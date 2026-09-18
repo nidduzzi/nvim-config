@@ -5,3 +5,7 @@ nvim
 
 spell/
 lazy-lock.json
+
+# The machine-local tier: settings for this machine only, never committed.
+# See lua/util/settings.lua.
+local.lua
