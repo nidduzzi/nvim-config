@@ -1,13 +1,22 @@
 --- Talk to a coding agent without letting it touch anything.
 ---
---- Every Neovim integration on the market is chat-and-apply: a terminal split,
---- the reverse-engineered IDE websocket, or an ACP chat buffer. In all of them
---- the agent edits files itself, with its own tools, and the plugin reloads the
---- buffer afterwards. None of them offers a read-only mode, because none of
---- them is in the write path.
+--- The established integrations are chat-and-apply: a terminal split
+--- (sidekick.nvim, driving any of a dozen CLIs), the reverse-engineered IDE
+--- websocket (claudecode.nvim, which LazyVim ships as an extra), or an ACP
+--- chat buffer (avante.nvim, codecompanion.nvim, agentic.nvim). In all of them
+--- the agent edits files with its own tools and the plugin reloads the buffer
+--- afterwards; applying the diff is the feature, and none of them models
+--- tool-disablement at all.
 ---
---- This one never lets a tool exist. What comes back is a finding, a hint or an
---- explanation. Never a patch. The typing stays yours.
+--- One project does make the same never-writes promise — aporia.nvim, "an AI
+--- tutor for Neovim that never writes code", which has a hint ladder too. It
+--- reaches an OpenAI-compatible endpoint with an API key, and answers into a
+--- chat buffer.
+---
+--- What is not covered by either: read-only against a subscription CLI. The
+--- CLI-driven plugins all write; the read-only one needs an API key. This sits
+--- in the gap. No tool ever exists, and what comes back is a finding, a hint or
+--- an explanation, never a patch. The typing stays yours.
 ---
 --- Which agent answers is a setting — see backends.lua — but the read-only
 --- property is not something a backend gets to claim. It has to be shown, with
