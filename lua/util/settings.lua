@@ -31,6 +31,16 @@ M.defaults = {
   -- nil means "whatever that backend prefers" — "sonnet" means nothing to
   -- Hermes, so naming a model globally is wrong. It is absent from this table
   -- rather than false, so M.names below is what makes it visible.
+  -- How much the agent may do. See util/agent/backends.lua for what each rung
+  -- permits and what the guarantee rests on.
+  --
+  --   chat  context  explore  edit  normal
+  --
+  -- The default is the second rung, not the first: `context` is what this
+  -- configuration did before the ladder existed, and a default that silently
+  -- took code away would be a surprise rather than a safeguard.
+  agent_trust = "context",
+
   -- Use a backend whose inability to write has not been demonstrated here.
   agent_allow_unproven = false,
   -- Milliseconds before a request is abandoned. A local model needs far more
@@ -51,6 +61,7 @@ M.defaults = {
 M.names = {
   "agent_backend",
   "agent_model",
+  "agent_trust",
   "agent_allow_unproven",
   "agent_timeout",
   "search_preset",

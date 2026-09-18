@@ -147,6 +147,18 @@ map("n", "<leader>au", function()
   require("util.agent").use()
 end, { desc = "Switch which agent answers" })
 
+map("n", "<leader>at", function()
+  require("util.agent").trust()
+end, { desc = "How much the agent may do" })
+
+map("n", "<leader>a+", function()
+  require("util.agent").trust(nil, 1)
+end, { desc = "Let the agent do one thing more" })
+
+map("n", "<leader>a-", function()
+  require("util.agent").trust(nil, -1)
+end, { desc = "Let the agent do one thing less" })
+
 map("n", "<leader>a?", function()
   require("util.settings").show()
 end, { desc = "Which settings are in force, and from where" })

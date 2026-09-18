@@ -108,6 +108,7 @@ function M.next(question)
   }, "\n")
 
   agent.ask(prompt, {
+    uses_code = true,
     label = ("Hint %d of %d"):format(at.rung, #M.rungs),
     on_done = function(text)
       panel.show(

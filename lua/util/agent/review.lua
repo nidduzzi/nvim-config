@@ -254,6 +254,7 @@ function M.run()
   }, "\n")
 
   agent.ask(prompt, {
+    uses_code = true,
     schema = SCHEMA,
     label = "Reviewing " .. scope.name,
     on_done = function(text, structured)

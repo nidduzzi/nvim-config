@@ -1,26 +1,59 @@
---- Which coding agent answers, and what each one can actually promise.
+--- Which coding agent answers, how much it is allowed to do, and what each
+--- one can actually promise.
 ---
 --- Nothing above this file is Claude-specific: the modes want an answer, a
---- conversation that persists, and a guarantee that nothing was written. Any
+--- conversation that persists, and a guarantee about what was reachable. Any
 --- CLI that can do those three can sit here.
 ---
 --- The third one is the difficult one, and it is the reason this file exists
 --- rather than a `cmd` option. Every agent disables tools differently, some
 --- cannot disable them at all, and one of them turns approvals *off* in the
---- same flag that makes it non-interactive. A backend that has not been shown
---- to refuse a write is not a backend this can use, so each one declares how it
---- is locked down and whether that has been proven on this machine.
+--- same flag that makes it non-interactive.
 ---
---- Prove it with tools/nvim-harness/agent-canary.sh, which asks the agent to
---- overwrite a file and then looks at the file.
+--- The rungs
+---
+--- How much the agent may do is a setting rather than a property of this
+--- configuration, because the honest amount changes with the task. Reading an
+--- unfamiliar codebase and fixing a typo want different agents.
+---
+---   chat      no tools, and the prompt carries nothing but what you typed.
+---             The rubber duck: it cannot see your code, so explaining it is
+---             your job, which is the part that does the teaching.
+---   context   no tools, and the editor gathers the function, file, diff or
+---             diagnostic and puts it in the prompt. The agent still reads
+---             nothing itself; you choose how much it sees.
+---   explore   Read, Grep and Glob. It follows a call chain you did not think
+---             to paste. It cannot write and cannot run a shell.
+---   edit      the above plus Edit and Write, and still no shell.
+---   normal    not this file's business. sidekick.nvim's terminal, with the
+---             CLI's own defaults, and no promise made here about any of it.
+---
+--- A rung a backend cannot express is refused rather than approximated. Hermes
+--- has one toolset covering reading and writing together, so it has no
+--- `explore`: offering one would mean claiming a guarantee the flag does not
+--- give.
+---
+--- Why the registry and not the flag that looks right
+---
+--- `--allowedTools Read Grep Glob` reads like the way to do this and does not
+--- restrict anything. Asked for its registry under that flag, Claude reported
+--- all twenty-nine tools, Bash, Write and Edit among them: it is a list of
+--- permissions to grant without asking, not a list of tools to load. `--tools`
+--- is the one that empties and narrows the registry, and it is what every rung
+--- below is built from.
+---
+--- Prove it with tools/nvim-harness/agent-canary.sh, which checks the CLI's
+--- own registry against the rung and then asks the agent to write anyway.
 
 local M = {}
 
 ---@class agent.Backend
 ---@field cmd string executable to look for
 ---@field label string what to call it
----@field lockdown string[] flags that remove every tool
----@field argv fun(self: agent.Backend, prompt: string, schema: table|nil, session: string|nil, model: string|nil): string[]
+---@field lockdown string[] flags for the tightest rung, kept for the canary
+---@field rungs table<string, string[]|false> flags per rung; false means the backend cannot express it
+---@field rung_proof table<string, string> what the guarantee on each rung rests on
+---@field argv fun(self: agent.Backend, prompt: string, schema: table|nil, session: string|nil, model: string|nil, rung: string|nil): string[]
 ---@field parse fun(self: agent.Backend, stdout: string): agent.Answer|nil
 ---@field session_by "id"|"name" how a conversation is resumed
 ---@field native_schema boolean whether the CLI constrains the output itself
@@ -78,6 +111,48 @@ local function describe_schema(schema)
   }, "\n")
 end
 
+--- The rungs, tightest first. The order is the ladder: `<leader>a+` moves one
+--- step along this list, and nothing skips.
+---@type string[]
+M.rungs = { "chat", "context", "explore", "edit", "normal" }
+
+--- What each rung means, in one line, for the picker and the panel.
+---@type table<string, string>
+M.rung_desc = {
+  chat = "no tools, and none of your code — you explain it",
+  context = "no tools; the editor puts the code in the prompt",
+  explore = "reads and greps for itself; cannot write",
+  edit = "reads and writes files; still no shell",
+  normal = "sidekick.nvim's terminal, with the agent's own defaults",
+}
+
+--- Whether a rung lets the editor gather code into the prompt.
+---@param rung string
+---@return boolean
+function M.sends_context(rung)
+  return rung ~= "chat"
+end
+
+--- Whether a rung is answered headlessly here rather than in a terminal.
+---@param rung string
+---@return boolean
+function M.is_ours(rung)
+  return rung ~= "normal"
+end
+
+--- One step along the ladder, clamped at both ends.
+---@param rung string
+---@param by integer
+---@return string
+function M.step(rung, by)
+  for i, name in ipairs(M.rungs) do
+    if name == rung then
+      return M.rungs[math.min(#M.rungs, math.max(1, i + by))] or rung
+    end
+  end
+  return M.rungs[1]
+end
+
 --- Claude Code.
 ---
 --- The strongest guarantee of the three, because it is the only one that can
@@ -96,15 +171,30 @@ M.claude = {
   cmd = "claude",
   label = "Claude Code",
   lockdown = { "--tools", "", "--strict-mcp-config" },
+  -- `--strict-mcp-config` on every rung, because `--tools` does not drop the
+  -- MCP servers: without it Claude kept Drive, browser and codegraph whatever
+  -- the built-in set was narrowed to.
+  rungs = {
+    chat = { "--tools", "", "--strict-mcp-config" },
+    context = { "--tools", "", "--strict-mcp-config" },
+    explore = { "--tools", "Read,Grep,Glob", "--strict-mcp-config" },
+    edit = { "--tools", "Read,Grep,Glob,Edit,Write", "--strict-mcp-config" },
+  },
+  rung_proof = {
+    chat = "startup registry reports tools=[] mcp_servers=[]",
+    context = "startup registry reports tools=[] mcp_servers=[]",
+    explore = "startup registry reports exactly Glob, Grep, Read",
+    edit = "startup registry reports no Bash and no Task",
+  },
   session_by = "id",
   native_schema = true,
   proven = true,
   proof = "the CLI's own startup registry reports tools=[] mcp_servers=[]",
   default_model = "sonnet",
 
-  argv = function(self, prompt, schema, session, model)
+  argv = function(self, prompt, schema, session, model, rung)
     local argv = { self.cmd, "-p", "--output-format", "json" }
-    vim.list_extend(argv, self.lockdown)
+    vim.list_extend(argv, self.rungs[rung or "context"] or self.lockdown)
     if model then
       vim.list_extend(argv, { "--model", model })
     end
@@ -170,6 +260,21 @@ M.hermes = {
   cmd = "hermes",
   label = "Hermes",
   lockdown = { "-t", "todo" },
+  -- `file` is one toolset covering reading and writing, so there is no rung
+  -- between "no tools" and "can write". `explore` is false rather than mapped
+  -- to `file`, because mapping it would hand back a guarantee the flag does
+  -- not make.
+  rungs = {
+    chat = { "-t", "todo" },
+    context = { "-t", "todo" },
+    explore = false,
+    edit = { "-t", "file" },
+  },
+  rung_proof = {
+    chat = "behaviour only: three write attempts and a shell attempt all failed",
+    context = "behaviour only: three write attempts and a shell attempt all failed",
+    edit = "not verified here; the file toolset is documented as file operations",
+  },
   session_by = "name",
   native_schema = false,
   proven = true,
@@ -180,9 +285,9 @@ M.hermes = {
   -- cut this off mid-answer.
   timeout = 300000,
 
-  argv = function(self, prompt, schema, session, model)
+  argv = function(self, prompt, schema, session, model, rung)
     local argv = { self.cmd }
-    vim.list_extend(argv, self.lockdown)
+    vim.list_extend(argv, self.rungs[rung or "context"] or self.lockdown)
     -- Skip AGENTS.md, memory and preloaded skills: this asks about the code in
     -- front of it, and the rest is prompt that has to be paid for every call.
     table.insert(argv, "--ignore-rules")
@@ -222,14 +327,24 @@ M.codex = {
   cmd = "codex",
   label = "Codex",
   lockdown = { "--sandbox", "read-only" },
+  -- Written from the documentation, run against nothing. Every entry here is a
+  -- guess until the canary has been pointed at it, which is what `proven =
+  -- false` above says out loud.
+  rungs = {
+    chat = { "--sandbox", "read-only" },
+    context = { "--sandbox", "read-only" },
+    explore = { "--sandbox", "read-only" },
+    edit = { "--sandbox", "workspace-write" },
+  },
+  rung_proof = {},
   session_by = "id",
   native_schema = false,
   proven = false,
   proof = nil,
 
-  argv = function(self, prompt, schema, _, model)
+  argv = function(self, prompt, schema, _, model, rung)
     local argv = { self.cmd, "exec" }
-    vim.list_extend(argv, self.lockdown)
+    vim.list_extend(argv, self.rungs[rung or "context"] or self.lockdown)
     if model then
       vim.list_extend(argv, { "--model", model })
     end
@@ -258,6 +373,30 @@ function M.resolve(name)
     )
   end
   return backend, nil
+end
+
+--- Whether a backend can honestly offer a rung, and why not when it cannot.
+---@param backend agent.Backend
+---@param rung string
+---@return boolean ok
+---@return string|nil why_not
+function M.supports(backend, rung)
+  if rung == "normal" then
+    -- Nothing here runs it, so there is nothing here to refuse.
+    return true, nil
+  end
+  local flags = (backend.rungs or {})[rung]
+  if flags == false then
+    return false,
+      ("%s has no %s rung: its toolsets do not separate reading from writing, and pretending otherwise would be a guarantee it cannot keep."):format(
+        backend.label,
+        rung
+      )
+  end
+  if not flags then
+    return false, ("%s does not define a %s rung."):format(backend.label, rung)
+  end
+  return true, nil
 end
 
 --- Every backend, for health reporting.

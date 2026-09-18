@@ -144,14 +144,48 @@ local function dismiss(notice)
   end)
 end
 
---- Ask the configured agent something, with no tools and no way to write.
+--- Ask the configured agent something, with exactly the tools the current rung
+--- allows and no more.
 ---
 ---@param prompt string
----@param opts { schema?: table, on_done: fun(text: string, structured: table|nil), label?: string }
+---@param opts { schema?: table, on_done: fun(text: string, structured: table|nil), label?: string, uses_code?: boolean }
 function M.ask(prompt, opts)
   local backend, problem = backends.resolve(M.config.backend)
   if not backend then
     vim.notify(problem or "No backend.", vim.log.levels.ERROR, { title = "Agent" })
+    return
+  end
+
+  local rung = M.config.trust
+
+  -- The top rung is a terminal someone else runs. Answering it here would be
+  -- this file quietly doing something it makes no promise about.
+  if not backends.is_ours(rung) then
+    vim.notify(
+      ("The %s rung is sidekick.nvim's terminal, not this. Open it with <leader>an, or step back down with <leader>a-."):format(
+        rung
+      ),
+      vim.log.levels.WARN,
+      { title = "Agent" }
+    )
+    return
+  end
+
+  local can, why_not = backends.supports(backend, rung)
+  if not can then
+    vim.notify(why_not or "That rung is unavailable.", vim.log.levels.ERROR, { title = "Agent" })
+    return
+  end
+
+  -- On the first rung the agent sees no code at all, so the modes that exist
+  -- to talk about code have nothing to say. Refusing is the point of the rung
+  -- rather than a limitation of it: the explaining is yours to do.
+  if opts.uses_code and not backends.sends_context(rung) then
+    vim.notify(
+      "The chat rung sends none of your code, so there is nothing here to review or explain.\n\nAsk a question with <leader>aa, or step up to context with <leader>a+.",
+      vim.log.levels.WARN,
+      { title = "Agent" }
+    )
     return
   end
 
@@ -183,7 +217,7 @@ function M.ask(prompt, opts)
 
   local root = M.root()
   local session = read_session(root, backend)
-  local argv = backend:argv(prompt, opts.schema, session, M.config.model or backend.default_model)
+  local argv = backend:argv(prompt, opts.schema, session, M.config.model or backend.default_model, rung)
 
   -- A toast with no timeout, so it stays while the call is out.
   local notice = "nvim-agent-pending"
@@ -275,13 +309,80 @@ function M.use(name)
   vim.ui.select(names, { prompt = "Ask which agent?" }, apply)
 end
 
+--- Move one rung along the ladder, or pick one outright.
+---
+--- Escalation is deliberate and one step at a time. Anything that jumped
+--- straight to the top would make the ladder decoration: the point is that
+--- letting an agent read your repository, and then write to it, are two
+--- separate decisions you make on purpose.
+---@param to? string a rung name, or nil to pick from a list
+---@param by? integer steps along the ladder, when `to` is nil
+function M.trust(to, by)
+  local function apply(choice)
+    if not choice or choice == "" then
+      return
+    end
+    if not vim.tbl_contains(backends.rungs, choice) then
+      vim.notify(
+        ("There is no %q rung. Known: %s."):format(choice, table.concat(backends.rungs, ", ")),
+        vim.log.levels.ERROR,
+        { title = "Agent" }
+      )
+      return
+    end
+
+    local backend = backends[M.config.backend]
+    if backend then
+      local can, why_not = backends.supports(backend, choice)
+      if not can then
+        vim.notify(why_not or "That rung is unavailable.", vim.log.levels.ERROR, { title = "Agent" })
+        return
+      end
+    end
+
+    M.config.trust = choice
+    local proof = backend and (backend.rung_proof or {})[choice]
+    vim.notify(
+      table.concat({
+        ("%s: %s"):format(choice, backends.rung_desc[choice] or ""),
+        proof and ("verified by: " .. proof) or "no verification recorded for this rung",
+      }, "\n"),
+      choice == "normal" and vim.log.levels.WARN or vim.log.levels.INFO,
+      { title = "Agent" }
+    )
+  end
+
+  if to then
+    apply(to)
+    return
+  end
+  if by then
+    apply(backends.step(M.config.trust, by))
+    return
+  end
+
+  local items = {}
+  for _, rung in ipairs(backends.rungs) do
+    table.insert(items, rung)
+  end
+  vim.ui.select(items, {
+    prompt = "How much may the agent do?",
+    format_item = function(rung)
+      return ("%-8s %s"):format(rung, backends.rung_desc[rung] or "")
+    end,
+  }, apply)
+end
+
 --- What this editor session has cost so far.
 function M.report()
   local backend = backends[M.config.backend]
   vim.notify(
     table.concat({
       ("agent: %s"):format(backend and backend.label or M.config.backend),
-      ("cannot write: %s"):format(backend and backend.proof or "NOT VERIFIED"),
+      ("rung: %s — %s"):format(M.config.trust, backends.rung_desc[M.config.trust] or ""),
+      ("guarantee: %s"):format(
+        (backend and (backend.rung_proof or {})[M.config.trust]) or "NOT VERIFIED for this rung"
+      ),
       ("calls this session: %d"):format(M.spend.calls),
       ("spent: %s"):format(M.spend.usd > 0 and ("$%.4f"):format(M.spend.usd) or "not reported by this agent"),
       ("last call: %s"):format(M.spend.last_ms and (M.spend.last_ms .. "ms") or "none yet"),

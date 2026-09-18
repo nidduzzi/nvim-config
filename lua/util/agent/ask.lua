@@ -93,6 +93,7 @@ function M.explain()
   }, "\n")
 
   agent.ask(prompt, {
+    uses_code = true,
     label = diagnostics ~= "" and "Explaining the error" or "Explaining",
     on_done = function(text)
       panel.show(diagnostics ~= "" and "What this error means" or "What this does", text)
@@ -108,23 +109,31 @@ function M.ask(question)
       return
     end
 
-    local ctx = context.here()
-    local prompt = table.concat({
-      "Answer this question about the code below.",
+    -- The one mode that works on every rung, because on the first one it is
+    -- the whole point: no code goes out, so the question has to carry your
+    -- understanding of it. That is rubber-ducking, and the explaining is the
+    -- part that teaches.
+    local backends = require("util.agent.backends")
+    local with_code = backends.sends_context(agent.config.trust)
+
+    local lines = {
+      with_code and "Answer this question about the code below."
+        or "Answer this question. You have not been shown the code, so answer from the description, and say plainly which part you are guessing at.",
       "",
       NO_CODE,
       "",
       context.preamble(),
       "Question: " .. q,
-      "",
-      ("Code (%s):"):format(ctx.name),
-      ctx.text,
-    }, "\n")
+    }
+    if with_code then
+      local ctx = context.here()
+      vim.list_extend(lines, { "", ("Code (%s):"):format(ctx.name), ctx.text })
+    end
 
-    agent.ask(prompt, {
-      label = "Asking",
+    agent.ask(table.concat(lines, "\n"), {
+      label = with_code and "Asking" or "Asking, without your code",
       on_done = function(text)
-        panel.show("Answer", text)
+        panel.show(with_code and "Answer" or "Answer, from your description alone", text)
       end,
     })
   end
