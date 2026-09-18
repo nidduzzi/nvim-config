@@ -25,8 +25,15 @@
 ---   explore   Read, Grep and Glob. It follows a call chain you did not think
 ---             to paste. It cannot write and cannot run a shell.
 ---   edit      the above plus Edit and Write, and still no shell.
----   normal    not this file's business. sidekick.nvim's terminal, with the
----             CLI's own defaults, and no promise made here about any of it.
+---   normal    the CLI as the CLI runs, with its own defaults, and no promise
+---             made here about any of it.
+---
+--- The rungs are flags rather than a mode, so they narrow an interactive
+--- session exactly as they narrow a headless one. sidekick.nvim's terminal
+--- runs the same command: see terminal_tools below, and lua/plugins/sidekick.
+--- Without that the terminal would be the one place where "how much may it do"
+--- had no answer, and the easiest way to reach the agent would be the way that
+--- walks around the ladder.
 ---
 --- A rung a backend cannot express is refused rather than approximated. Hermes
 --- has one toolset covering reading and writing together, so it has no
@@ -373,6 +380,63 @@ function M.resolve(name)
     )
   end
   return backend, nil
+end
+
+--- The command a terminal should run for this backend at this rung.
+---
+--- The rung flags are flags, not a mode, so the same ones that narrow a
+--- headless request narrow an interactive session. That matters more than it
+--- looks: without this the top of the ladder would be the only rung where
+--- "how much may it do" had no answer, and the obvious way to use the terminal
+--- would be the way that bypasses the ladder entirely.
+---
+--- `normal` is the exception on purpose. It runs the CLI the way the CLI runs,
+--- and the absence of flags is the promise being withdrawn.
+---@param backend agent.Backend
+---@param rung string
+---@return string[]|nil
+function M.terminal_cmd(backend, rung)
+  local cmd = { backend.cmd }
+  if rung == "normal" then
+    return cmd
+  end
+  local flags = (backend.rungs or {})[rung]
+  if not flags then
+    return nil
+  end
+  vim.list_extend(cmd, flags)
+  return cmd
+end
+
+--- What sidekick.nvim should call this backend-and-rung pair.
+---@param name string
+---@param rung string
+---@return string
+function M.terminal_name(name, rung)
+  return rung == "normal" and name or (name .. "_" .. rung)
+end
+
+--- Every backend-and-rung pair, as sidekick.nvim's tool table wants them.
+---
+--- Generated rather than written out, so a rung added above appears in the
+--- terminal without being added twice and without the two drifting.
+---@return table<string, table>
+function M.terminal_tools()
+  local tools = {}
+  for _, name in ipairs({ "claude", "hermes", "codex" }) do
+    local backend = M[name]
+    for _, rung in ipairs(M.rungs) do
+      local cmd = M.terminal_cmd(backend, rung)
+      if cmd then
+        tools[M.terminal_name(name, rung)] = {
+          cmd = cmd,
+          is_proc = ("\\<%s\\>"):format(backend.cmd),
+          url = backend.url,
+        }
+      end
+    end
+  end
+  return tools
 end
 
 --- Whether a backend can honestly offer a rung, and why not when it cannot.
