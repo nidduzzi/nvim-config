@@ -1,29 +1,69 @@
--- Debuggers for the compiled languages, and for Julia.
+-- Debuggers for the languages nothing else here covers.
 --
--- lazyvim.plugins.extras.dap.core brings nvim-dap and installs debugpy and the
--- JavaScript adapter, which covers Python, TypeScript and TSX. Rust, C, C++
--- and Julia are not covered by anything this configuration loads.
+-- lazyvim.plugins.extras.dap.core brings nvim-dap and covers Python,
+-- JavaScript, TypeScript and TSX. LazyVim's lang.rust and lang.clangd extras
+-- would add the rest and also rustaceanvim, crates.nvim and clangd_extensions,
+-- each of which starts a language server on its own terms. This configuration
+-- attaches only what a project provides, so the adapters are taken and the rest
+-- is left. See DECISIONS.md.
 --
--- LazyVim's lang.rust and lang.clangd extras would add them, and also
--- rustaceanvim, crates.nvim and clangd_extensions, each of which decides for
--- itself which language server to start. This configuration attaches only what
--- a project provides (see util/lsp.lua), so the adapters are taken and the
--- rest is left. See DECISIONS.md.
---
--- codelldb speaks to Rust, C and C++ alike; it is LLDB with a DAP front end.
--- Julia has no adapter in any distribution: DebugAdapter.jl is a package the
--- project itself must depend on, so it is wired up only when the project has
--- it.
-local function codelldb_configuration(name)
+-- Every path is resolved when a session starts, so moving a toolchain or
+-- opening a different project needs no edit here.
+
+local function project_root()
+  return require("util.lsp").root(vim.fn.getcwd())
+end
+
+---@param root string
+---@param name string
+---@return string|nil
+local function in_project(root, name)
+  if not require("util.trust").is_trusted(root) then
+    return nil
+  end
+  for _, dir in ipairs(require("util.lsp").bin_dirs(root)) do
+    for _, candidate in ipairs(vim.fn.glob(vim.fs.joinpath(root, dir, name), false, true)) do
+      if vim.fn.executable(candidate) == 1 then
+        return candidate
+      end
+    end
+  end
+end
+
+---@param root string
+---@param name string
+---@return string|nil
+local function anywhere(root, name)
+  return in_project(root, name) or (vim.fn.executable(name) == 1 and vim.fn.exepath(name) or nil)
+end
+
+---@param what string
+---@param root string
+---@return string
+local function missing(what, root)
+  if #require("util.lsp").bin_dirs(root) > 0 and not require("util.trust").is_trusted(root) then
+    return ("%s may be in this project, which is not trusted.\n\n:DotfilesTrustProject to use it."):format(what)
+  end
+  return ("%s was not found in this project or on PATH."):format(what)
+end
+
+-- The DAP protocol does not say which languages an adapter speaks, so this
+-- cannot be asked of the adapter. codelldb is LLDB, and these are what LLDB
+-- debugs: a fact about the debugger rather than a preference.
+local CODELLDB_FILETYPES = { "rust", "c", "cpp", "objc", "objcpp", "zig" }
+
+---@param filetype string
+---@param root string
+local function codelldb_configurations(filetype, root)
   return {
     {
       type = "codelldb",
       request = "launch",
-      name = "Launch " .. name .. " executable",
+      name = "Launch a " .. filetype .. " executable",
       program = function()
-        return vim.fn.input("Path to executable: ", vim.fn.getcwd() .. "/", "file")
+        return vim.fn.input("Path to executable: ", root .. "/", "file")
       end,
-      cwd = "${workspaceFolder}",
+      cwd = root,
       stopOnEntry = false,
     },
     {
@@ -33,57 +73,23 @@ local function codelldb_configuration(name)
       pid = function()
         return require("dap.utils").pick_process()
       end,
-      cwd = "${workspaceFolder}",
+      cwd = root,
     },
   }
 end
 
-local function julia_configuration()
+---@param root string
+local function julia_configurations(root)
   return {
     {
       type = "julia",
       request = "launch",
       name = "Run this file",
       program = "${file}",
-      cwd = "${workspaceFolder}",
-      juliaEnv = "${workspaceFolder}",
+      cwd = root,
+      juliaEnv = root,
     },
   }
-end
-
----@param root string
----@return string|nil
-local function project_python(root)
-  local trust = require("util.trust")
-  for _, dir in ipairs(require("util.lsp").bin_dirs(root)) do
-    for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/python", false, true)) do
-      if vim.fn.executable(candidate) == 1 then
-        return trust.is_trusted(root) and candidate or nil
-      end
-    end
-  end
-end
-
----@return string[]|nil argv
----@return string|nil why_not
-local function debugpy_command()
-  local root = require("util.lsp").root(vim.fn.getcwd())
-
-  local python = project_python(root)
-  if python then
-    return { python, "-m", "debugpy.adapter" }
-  end
-
-  if vim.fn.executable("debugpy-adapter") == 1 then
-    return { vim.fn.exepath("debugpy-adapter") }
-  end
-
-  local venv = #require("util.lsp").bin_dirs(root) > 0
-  if venv then
-    return nil,
-      "This project has a Python environment, but it is not trusted.\n\n:DotfilesTrustProject to debug with it, or install debugpy with :MasonInstall debugpy."
-  end
-  return nil, "No debugpy. Install it in the project, or with :MasonInstall debugpy."
 end
 
 return {
@@ -92,25 +98,39 @@ return {
     optional = true,
     config = function()
       local dap = require("dap")
+
       pcall(function()
         require("dap-python").setup("debugpy-adapter")
       end)
-      dap.adapters.python = function(callback, config)
-        local argv, why_not = debugpy_command()
-        if not argv then
-          vim.notify(why_not, vim.log.levels.ERROR, { title = "Python debugger" })
+
+      dap.adapters.python = function(callback)
+        local root = project_root()
+        local python = in_project(root, "python") or in_project(root, "python3")
+
+        if python then
+          callback({
+            type = "executable",
+            command = python,
+            args = { "-m", "debugpy.adapter" },
+            options = { source_filetype = "python" },
+            enrich_config = function(config, on_config)
+              config.pythonPath = config.pythonPath or python
+              on_config(config)
+            end,
+          })
           return
         end
-        callback({
-          type = "executable",
-          command = argv[1],
-          args = vim.list_slice(argv, 2),
-          options = { source_filetype = "python" },
-          enrich_config = function(cfg, on_config)
-            cfg.pythonPath = cfg.pythonPath or argv[1]
-            on_config(cfg)
-          end,
-        })
+
+        if vim.fn.executable("debugpy-adapter") == 1 then
+          callback({
+            type = "executable",
+            command = vim.fn.exepath("debugpy-adapter"),
+            options = { source_filetype = "python" },
+          })
+          return
+        end
+
+        vim.notify(missing("debugpy", root), vim.log.levels.ERROR, { title = "Python debugger" })
       end
     end,
   },
@@ -131,35 +151,50 @@ return {
     opts = function()
       local dap = require("dap")
 
-      dap.adapters.codelldb = dap.adapters.codelldb
-        or {
+      dap.adapters.codelldb = function(callback)
+        local root = project_root()
+        local command = anywhere(root, "codelldb")
+        if not command then
+          vim.notify(missing("codelldb", root), vim.log.levels.ERROR, { title = "Debugger" })
+          return
+        end
+        callback({
           type = "server",
           host = "localhost",
           port = "${port}",
-          executable = {
-            command = "codelldb",
-            args = { "--port", "${port}" },
-          },
-        }
-
-      for _, language in ipairs({ "rust", "c", "cpp" }) do
-        dap.configurations[language] = dap.configurations[language] or codelldb_configuration(language)
+          executable = { command = command, args = { "--port", "${port}" } },
+        })
       end
 
-      -- Started through the project's own Julia, because DebugAdapter is a
-      -- dependency of the project rather than a tool the editor installs.
-      dap.adapters.julia = dap.adapters.julia
-        or {
+      dap.adapters.julia = function(callback)
+        local root = project_root()
+        local command = anywhere(root, "julia")
+        if not command then
+          vim.notify(missing("julia", root), vim.log.levels.ERROR, { title = "Julia debugger" })
+          return
+        end
+        callback({
           type = "executable",
-          command = "julia",
+          command = command,
           args = {
-            "--project=.",
+            "--project=" .. root,
             "-e",
             [[using DebugAdapter; DebugAdapter.run_debugger(stdin, stdout)]],
           },
-        }
+        })
+      end
 
-      dap.configurations.julia = dap.configurations.julia or julia_configuration()
+      vim.api.nvim_create_autocmd("FileType", {
+        group = vim.api.nvim_create_augroup("dotfiles_dap_configurations", { clear = true }),
+        pattern = vim.list_extend({ "julia" }, CODELLDB_FILETYPES),
+        callback = function(event)
+          if dap.configurations[event.match] then
+            return
+          end
+          local root = project_root()
+          dap.configurations[event.match] = event.match == "julia" and julia_configurations(root) or codelldb_configurations(event.match, root)
+        end,
+      })
     end,
   },
 }
