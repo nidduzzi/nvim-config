@@ -119,6 +119,10 @@ end
 ---@param lhs string
 ---@param before table|nil
 ---@param buffer boolean
+---@param mode string
+---@param lhs string
+---@param before table|string|nil
+---@param buffer integer|nil the buffer a buffer-local set applied to
 local function record(mode, lhs, before, buffer)
   local previous = type(before) == "string" and before or summarise(before)
   if previous == "" then
@@ -133,7 +137,21 @@ local function record(mode, lhs, before, buffer)
   -- What the key became is only knowable after the set has happened. A global
   -- set is judged against the global table, for the reason in global_map.
   vim.schedule(function()
-    local after = buffer and summarise(vim.fn.maparg(lhs, mode, false, true)) or global_map(mode, lhs)
+    -- Read a buffer-local mapping in the buffer it was set for. This runs on
+    -- the next tick, by which time the current buffer may be something else
+    -- entirely — and then maparg answers about the wrong buffer, finds the
+    -- global mapping unchanged, and concludes nothing happened.
+    local after
+    if buffer then
+      if not vim.api.nvim_buf_is_valid(buffer) then
+        return
+      end
+      vim.api.nvim_buf_call(buffer, function()
+        after = summarise(vim.fn.maparg(lhs, mode, false, true))
+      end)
+    else
+      after = global_map(mode, lhs)
+    end
 
     -- Replacing a mapping with the identical one is not an overwrite.
     if after == previous or after == "" then
@@ -194,16 +212,26 @@ function M.setup()
   ---@diagnostic disable-next-line: duplicate-set-field
   vim.keymap.set = function(mode, lhs, rhs, opts)
     local modes = type(mode) == "table" and mode or { mode }
-    local buffer = type(opts) == "table" and opts.buffer ~= nil
+
+    -- Which buffer, not merely whether. `buffer = true` and `buffer = 0` both
+    -- mean the current one, and it has to be resolved now rather than on the
+    -- next tick.
+    local buffer = nil
+    if type(opts) == "table" and opts.buffer ~= nil and opts.buffer ~= false then
+      buffer = (opts.buffer == true or opts.buffer == 0) and vim.api.nvim_get_current_buf() or opts.buffer
+    end
 
     for _, one in ipairs(modes) do
       -- A buffer-local set is judged by what the key does in this buffer,
       -- which is what maparg answers. A global set is judged by the global
       -- table, which is the only thing a global set can actually replace.
       if buffer then
-        local before = vim.fn.maparg(lhs, one, false, true)
+        local before
+        vim.api.nvim_buf_call(buffer, function()
+          before = vim.fn.maparg(lhs, one, false, true)
+        end)
         if before and not vim.tbl_isempty(before) then
-          record(one, lhs, before, true)
+          record(one, lhs, before, buffer)
         end
       else
         local before = global_map(one, lhs)
@@ -236,10 +264,25 @@ function M.setup()
         local args = { ... }
         local mode = is_buffer and args[2] or args[1]
         local lhs = is_buffer and args[3] or args[2]
+        -- nvim_buf_set_keymap takes the buffer first, and 0 means this one.
+        local buffer = nil
+        if is_buffer then
+          buffer = args[1] == 0 and vim.api.nvim_get_current_buf() or args[1]
+        end
 
-        local before = vim.fn.maparg(lhs, mode, false, true)
+        local before
+        if buffer then
+          if vim.api.nvim_buf_is_valid(buffer) then
+            vim.api.nvim_buf_call(buffer, function()
+              before = vim.fn.maparg(lhs, mode, false, true)
+            end)
+          end
+        else
+          before = vim.fn.maparg(lhs, mode, false, true)
+        end
+
         if before and not vim.tbl_isempty(before) then
-          record(mode, lhs, before, is_buffer)
+          record(mode, lhs, before, buffer)
         end
       end
 
