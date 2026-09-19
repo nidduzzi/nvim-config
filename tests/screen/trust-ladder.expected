@@ -6,7 +6,7 @@
                       ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝     ╚═╝
 
          ╭────────────────────────── How much may the agent do? ──────────────────────────╮
-         │                                                                           5/5 │
+         │                                                                           5/TOTAL │
          │────────────────────────────────────────────────────────────────────────────────│
          │ 1. chat     no tools, and none of your code — you explain it                   │
          │ 2. context  no tools; the editor puts the code in the prompt                   │
