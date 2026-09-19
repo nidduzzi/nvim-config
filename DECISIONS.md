@@ -218,3 +218,26 @@ same question at a moment of your choosing.
 
 **Not verified on Windows.** This is a measured cause with a plausible
 mechanism, not a confirmed fix. It needs one start on that machine to say.
+
+---
+
+## 13. c-c closes an overlay it is not standing in
+
+**Decided:** `dismiss` looks for an overlay window anywhere in the tabpage,
+preferring the one the cursor is in.
+
+**Against:** reading `vim.bo.filetype`, which is what it did.
+
+**On:** a combination matrix over ten overlay types found Trouble was never
+closed. Trouble and the quickfix list open without taking focus, so the
+current buffer is the file, not the list, and the key did nothing while a list
+sat in plain sight.
+
+This is the third time the same mistake has been found here — the hover float,
+the keyguard shadow, and now this. Each one read the state of the window the
+cursor happened to be in and called it the state of the editor.
+
+After: all ten close.
+
+    picker (files)  picker (grep)  lazy  help  checkhealth
+    quickfix  trouble  notification history  explorer  agent panel

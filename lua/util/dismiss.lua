@@ -71,6 +71,28 @@ local function floats()
   return found
 end
 
+--- The window showing something that is not a file, most recent first.
+---@return integer|nil
+function M.overlay_window()
+  local here = vim.api.nvim_get_current_win()
+  if M.overlay_filetypes[vim.bo.filetype] or vim.bo.buftype == "quickfix" then
+    return here
+  end
+
+  local found = {}
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buf = vim.api.nvim_win_get_buf(win)
+    if M.overlay_filetypes[vim.bo[buf].filetype] or vim.bo[buf].buftype == "quickfix" then
+      found[#found + 1] = win
+    end
+  end
+
+  table.sort(found, function(a, b)
+    return a > b
+  end)
+  return found[1]
+end
+
 --- Close the most intrusive thing that is open, and nothing else.
 ---
 --- Ordered so that the answer is never surprising: the thing covering the
@@ -111,12 +133,16 @@ function M.dismiss()
     return true
   end
 
-  -- Then a split showing something that is not a file.
-  if M.overlay_filetypes[vim.bo.filetype] or vim.bo.buftype == "quickfix" then
+  -- Then a split showing something that is not a file, whether or not the
+  -- cursor is in it. Trouble and the quickfix list open without taking focus,
+  -- and reading only the current buffer's filetype meant the key did nothing
+  -- while a list sat in plain sight.
+  local overlay = M.overlay_window()
+  if overlay then
     -- Not the last window: closing that quits the editor, which is a large
     -- answer to a small key.
     if #vim.api.nvim_tabpage_list_wins(0) > 1 then
-      pcall(vim.cmd.close)
+      pcall(vim.api.nvim_win_close, overlay, false)
       return true
     end
     pcall(vim.cmd.bdelete)
