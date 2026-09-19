@@ -17,8 +17,8 @@
                        │lsp_ignore            {}       built in                     │
                        │search_preset         code     built in                     │
                        │                                                            │
-                       │Machine-local file: CONFIG/nvim-lazyvim/ │
-                       │local.lua                                                   │
+                       │Machine-local file: CONFIG/nvim-lazyvim/local.│
+                       │lua                                                         │
                        │A project overrides it through vim.g.<name> in its .nvim.   │
                        │lua.                                                        │
                        ╰──────────────────────────────────────────────── a-q closes ╯

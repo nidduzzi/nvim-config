@@ -1,5 +1,6 @@
 # needs: lsp
-# attempts: 6
+# attempts: 4
+# pause: 6
 # size: 100x24
 Space
 ff
