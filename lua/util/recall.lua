@@ -209,9 +209,20 @@ function M.extensions(limit)
   end
 
   local counts = {}
-  local found = vim.fs.find(function(name, path)
-    return name:match("%.[%w]+$") ~= nil and not is_vendored(path)
-  end, { path = where, type = "file", limit = 4000 })
+
+  -- git already knows what the project contains, and asking it is one process
+  -- rather than a walk of the working tree. Walking label-studio took 218ms of
+  -- blocking time; on a filesystem slower than this one it is seconds.
+  local found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
+  if vim.v.shell_error ~= 0 then
+    found = vim.fs.find(function(name, path)
+      return name:match("%.[%w]+$") ~= nil and not is_vendored(path)
+    end, { path = where, type = "file", limit = 4000 })
+  else
+    found = vim.tbl_filter(function(file)
+      return not is_vendored(file)
+    end, found)
+  end
 
   for _, file in ipairs(found) do
     local ext = file:match("%.([%w]+)$")
@@ -222,7 +233,10 @@ function M.extensions(limit)
 
   local exts = vim.tbl_keys(counts)
   table.sort(exts, function(a, b)
-    return counts[a] > counts[b]
+    if counts[a] ~= counts[b] then
+      return counts[a] > counts[b]
+    end
+    return a < b
   end)
 
   extension_cache[where] = exts

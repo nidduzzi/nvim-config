@@ -241,3 +241,37 @@ After: all ten close.
 
     picker (files)  picker (grep)  lazy  help  checkhealth
     quickfix  trouble  notification history  explorer  agent panel
+
+---
+
+## 14. The extension list is read from git
+
+**Decided:** `recall.extensions` asks `git ls-files` and falls back to walking
+the tree when there is no repository.
+
+**On:** the walk took 218.3ms on label-studio, blocking the main loop the
+first time the extension filter is opened. git knows the answer already:
+11.8ms, an eighteenfold difference. On a slower filesystem the walk is
+seconds.
+
+Both paths give the same answer, and the git path also stops counting files
+nobody tracks.
+
+    label-studio  13.5ms  md png py ts js svg tsx jsx
+    crun           6.5ms  c h py sh md nix fmf yaml
+    fixture        2.7ms  md lua js py
+    nogit          4.2ms  py lua
+
+---
+
+## 15. Ties in a sort need a tiebreaker
+
+**Decided:** extensions sort by count, then by name.
+
+**On:** a spec failed one run in three. Two extensions with the same count
+compared equal, and `table.sort` is not stable, so the list came back in a
+different order each time — the filter would shuffle between sessions.
+
+This is the same fault fixed earlier in `capabilities.lua`. Two occurrences is
+a pattern: every comparator here should be a total order, and a spec that
+fails intermittently is the cheapest way to find one that is not.
