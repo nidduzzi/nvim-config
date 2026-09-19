@@ -21,11 +21,11 @@ local function in_project(root, name)
   if not require("util.trust").is_trusted(root) then
     return nil
   end
-  for _, dir in ipairs(require("util.lsp").bin_dirs(root)) do
-    for _, candidate in ipairs(vim.fn.glob(vim.fs.joinpath(root, dir, name), false, true)) do
-      if vim.fn.executable(candidate) == 1 then
-        return candidate
-      end
+  local lsp = require("util.lsp")
+  for _, dir in ipairs(lsp.bin_dirs(root)) do
+    local found = lsp.executables_named(root, dir, name)
+    if found[1] then
+      return found[1]
     end
   end
 end

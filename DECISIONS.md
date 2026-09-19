@@ -167,3 +167,28 @@ prompt.
 
 Resolved in 0.1ms against the three test projects: `hello`, `hello`, and
 `target/debug/rust-hello`.
+
+---
+
+## 11. Where a virtualenv keeps its programs is looked up, not assumed
+
+**Decided:** `bin_evidence` entries may be a function, and the virtualenv ones
+check which of `bin` or `Scripts` exists.
+
+**On:** a Windows virtualenv uses `Scripts`, and every path here said `bin`.
+The derivation that replaced the hardcoded list was itself hardcoded to one
+platform.
+
+Executables are matched by name **and** name-with-any-extension, because a
+Windows executable is `python.exe`. `glob(".../python")` finds nothing there.
+
+Verified both shapes on Linux, the Windows one by building a project with
+`.venv/pyvenv.cfg` and `.venv/Scripts/python.exe` and no `bin`:
+
+    bin_dirs: .venv/Scripts
+    python in .venv/Scripts -> .../Scripts/python.exe
+
+**Blocked, for the person whose machine this is:** none of this has run on
+Windows or macOS. It is reasoned from Neovim's documented behaviour and tested
+against a directory laid out the way Windows lays one out. A real check needs
+one of those machines.

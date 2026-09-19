@@ -31,16 +31,66 @@ local M = {}
 --- This list is about where tools live, not about which languages are
 --- supported: a server for any language is found as long as its executable
 --- ends up in one of these.
----@type { marker: string, bin: string, why: string }[]
+--- A virtualenv puts its programs in `bin`, or in `Scripts` on Windows.
+--- Whichever is there is the answer, so neither name is assumed.
+---@param where string
+---@return string|nil
+local function venv_bin(where)
+  for _, name in ipairs({ "bin", "Scripts" }) do
+    if vim.fn.isdirectory(vim.fs.joinpath(where, name)) == 1 then
+      return name
+    end
+  end
+end
+
+---@type { marker: string, bin: string|fun(root: string): string|nil, why: string }[]
 M.bin_evidence = {
-  { marker = "pyvenv.cfg", bin = "bin", why = "a Python virtualenv names itself" },
-  { marker = ".venv/pyvenv.cfg", bin = ".venv/bin", why = "a Python virtualenv in the usual place" },
-  { marker = "venv/pyvenv.cfg", bin = "venv/bin", why = "a Python virtualenv in the other usual place" },
+  {
+    marker = "pyvenv.cfg",
+    bin = function(root)
+      return venv_bin(root)
+    end,
+    why = "a Python virtualenv names itself",
+  },
+  {
+    marker = ".venv/pyvenv.cfg",
+    bin = function(root)
+      local name = venv_bin(vim.fs.joinpath(root, ".venv"))
+      return name and vim.fs.joinpath(".venv", name)
+    end,
+    why = "a Python virtualenv in the usual place",
+  },
+  {
+    marker = "venv/pyvenv.cfg",
+    bin = function(root)
+      local name = venv_bin(vim.fs.joinpath(root, "venv"))
+      return name and vim.fs.joinpath("venv", name)
+    end,
+    why = "a Python virtualenv in the other usual place",
+  },
   { marker = "package.json", bin = "node_modules/.bin", why = "npm, pnpm and yarn all install here" },
   { marker = "composer.json", bin = "vendor/bin", why = "Composer's documented location" },
   { marker = "Gemfile", bin = ".bundle/bin", why = "Bundler's binstubs" },
   { marker = ".envrc", bin = ".direnv/*/bin", why = "direnv's layout directory" },
 }
+
+--- Programs called `name` in `dir`, whatever extension the platform gives
+--- them. A Windows executable is python.exe, not python.
+---@param root string
+---@param dir string
+---@param name string
+---@return string[]
+function M.executables_named(root, dir, name)
+  local found = {}
+  for _, pattern in ipairs({ name, name .. ".*" }) do
+    for _, candidate in ipairs(vim.fn.glob(vim.fs.joinpath(root, dir, pattern), false, true)) do
+      if vim.fn.executable(candidate) == 1 and vim.fn.isdirectory(candidate) == 0 then
+        found[#found + 1] = candidate
+      end
+    end
+  end
+  return found
+end
 
 ---@param root string
 ---@return string[]
@@ -50,19 +100,27 @@ function M.bin_dirs(root)
 
   local activated = vim.env.VIRTUAL_ENV
   if activated and activated ~= "" and vim.startswith(activated, root) then
-    found[#found + 1] = vim.fs.relpath(root, activated .. "/bin") or (activated .. "/bin")
-    seen[found[#found]] = true
-  end
-
-  for _, evidence in ipairs(M.bin_evidence) do
-    local marker = vim.fn.glob(root .. "/" .. evidence.marker, false, true)
-    if #marker > 0 and not seen[evidence.bin] then
-      seen[evidence.bin] = true
-      found[#found + 1] = evidence.bin
+    local name = venv_bin(activated)
+    if name then
+      local directory = vim.fs.joinpath(activated, name)
+      found[#found + 1] = vim.fs.relpath(root, directory) or directory
+      seen[found[#found]] = true
     end
   end
 
-  if vim.uv.fs_stat(root .. "/result/bin") and not seen["result/bin"] then
+  for _, evidence in ipairs(M.bin_evidence) do
+    local marker = vim.fn.glob(vim.fs.joinpath(root, evidence.marker), false, true)
+    local directory = evidence.bin
+    if type(directory) == "function" then
+      directory = directory(root)
+    end
+    if #marker > 0 and directory and not seen[directory] then
+      seen[directory] = true
+      found[#found + 1] = directory
+    end
+  end
+
+  if vim.uv.fs_stat(vim.fs.joinpath(root, "result", "bin")) and not seen["result/bin"] then
     found[#found + 1] = "result/bin"
   end
 
@@ -141,7 +199,7 @@ function M.project_bin(name, start)
   local trusted = may_run_project_bin(root)
 
   for _, dir in ipairs(M.bin_dirs(root)) do
-    for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/" .. name, false, true)) do
+    for _, candidate in ipairs(M.executables_named(root, dir, name)) do
       if vim.fn.executable(candidate) == 1 then
         if not trusted then
           say_refused(root, candidate)
