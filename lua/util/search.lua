@@ -8,8 +8,8 @@
 ---
 --- So the filter is a mode you switch while the picker is open, not a decision
 --- you make before it. Each preset is a set of ripgrep globs. The active preset
---- shows in the picker title, and `<a-d>` cycles to the next one and re-runs
---- the search against the results already on screen.
+--- shows in the picker title, and one key cycles to the next one and re-runs
+--- the search against the results already on screen. See lua/plugins/picker.
 ---
 --- A project can define its own idea of what counts as documentation in its
 --- `.nvim.lua`:
@@ -71,7 +71,7 @@ local function glob_args(globs, exclude)
   return args
 end
 
---- The presets `<a-d>` cycles through, in order.
+--- The presets, in the order they are cycled through.
 ---
 --- `code` comes first because it is the common case: you are reading code and
 --- the prose is noise.
@@ -116,7 +116,7 @@ local function apply(picker, preset)
   picker:find({ refresh = true })
 end
 
---- Move to the next preset. Bound to `<a-d>` inside the picker.
+--- Move to the next preset.
 ---@param picker table
 function M.cycle(picker)
   local presets = M.presets()
@@ -135,7 +135,7 @@ function M.cycle(picker)
   vim.notify(next_preset.name .. ": " .. next_preset.desc, vim.log.levels.INFO, { title = "Search filter" })
 end
 
---- Pick a preset from a list instead of cycling. Bound to `<a-p>`.
+--- Pick a preset from a list instead of cycling.
 ---@param picker table
 function M.choose(picker)
   local presets = M.presets()
