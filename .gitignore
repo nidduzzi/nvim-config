@@ -9,3 +9,4 @@ spell/
 # See lua/util/settings.lua.
 local.lua
 .tests/
+tests/screen/*.drawn
