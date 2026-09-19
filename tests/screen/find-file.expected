@@ -21,4 +21,4 @@
          │   5   ---@param a number                                                       │
          │   6   ---@param b number                                                       │
          │   7   ---@return number                                                        │
- INSERT ╰   8   function M.add(a, b)                                                     ╯  HH:MM
+ INSERT ╰ 8 function M.add(a, b) ╯  HH:MM
