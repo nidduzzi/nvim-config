@@ -186,7 +186,7 @@ function M.features()
       key = "<leader>sy",
       kind = "feature",
       run = function()
-        require("util.yank").history()
+        Snacks.picker.yanky()
       end,
     },
     {
