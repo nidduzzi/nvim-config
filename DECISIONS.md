@@ -275,3 +275,24 @@ different order each time — the filter would shuffle between sessions.
 This is the same fault fixed earlier in `capabilities.lua`. Two occurrences is
 a pattern: every comparator here should be a total order, and a spec that
 fails intermittently is the cheapest way to find one that is not.
+
+---
+
+## 16. Every comparator audited for ties
+
+**Decided:** after two unstable sorts were found by accident, all eight
+`table.sort` comparators in `lua/` were read.
+
+**Found:** two more that could tie.
+
+`util/lsp_commands.lua` sorted server commands by name alone. Two language
+servers attached to the same buffer can advertise the same command, and then
+the menu order depended on hash order. Now command, then client name.
+
+`lua/plugins/dap.lua` sorted built executables by modification time alone. A
+build writes its outputs in the same second routinely: three binaries compiled
+together all had mtime 1767200400, so which one the debugger offered first was
+undefined. Now time, then path.
+
+The other four were already total: window ids are unique integers, and command
+and capability names are unique within their lists.

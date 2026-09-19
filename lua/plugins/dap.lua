@@ -101,9 +101,13 @@ local function built_executables(root)
   end
 
   table.sort(found, function(a, b)
-    local left = vim.uv.fs_stat(a)
-    local right = vim.uv.fs_stat(b)
-    return (left and left.mtime.sec or 0) > (right and right.mtime.sec or 0)
+    local left = (vim.uv.fs_stat(a) or {}).mtime
+    local right = (vim.uv.fs_stat(b) or {}).mtime
+    local newest, older = left and left.sec or 0, right and right.sec or 0
+    if newest ~= older then
+      return newest > older
+    end
+    return a < b
   end)
   return found
 end
