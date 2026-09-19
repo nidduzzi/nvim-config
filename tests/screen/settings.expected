@@ -21,4 +21,4 @@
                        │lua                                                         │
                        │A project overrides it through vim.g.<name> in its .nvim.   │
                        │lua.                                                        │
- ╰──────────────────────────────────────────────── a-q closes ╯
+                       ╰──────────────────────────────────────────────── a-q closes ╯
