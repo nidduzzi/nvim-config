@@ -48,7 +48,12 @@ require("lazy").setup({
     version = false,
   },
   install = { colorscheme = { "tokyonight", "habamax" } },
-  checker = { enabled = true, notify = false },
+  -- Off, because the plugins here are pinned by lazy-lock.json and updating
+  -- them is a deliberate act. Enabled, it runs `git fetch` for every plugin
+  -- shortly after startup: 53 git processes, each one reaching github.com.
+  -- That is invisible here and is what a slow start on another machine is
+  -- made of. `:Lazy check` asks the same question when the answer is wanted.
+  checker = { enabled = false },
   change_detection = { notify = false },
   performance = {
     rtp = {

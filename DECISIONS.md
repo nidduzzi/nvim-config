@@ -192,3 +192,29 @@ Verified both shapes on Linux, the Windows one by building a project with
 Windows or macOS. It is reasoned from Neovim's documented behaviour and tested
 against a directory laid out the way Windows lays one out. A real check needs
 one of those machines.
+
+---
+
+## 12. The update checker is off
+
+**Decided:** `checker = { enabled = false }`.
+
+**Against:** leaving it on with `notify = false`, which is what it was.
+
+**On:** measured, not guessed. With the checker's last-check timestamp reset,
+one startup spawned **53 git invocations** — `git fetch --recurse-submodules
+--tags --force --progress` and a `git remote-https` to github.com for every
+plugin in the lockfile. With it off, zero.
+
+It costs nothing visible here: startup is 68.8ms either way, because the work
+happens after the editor is usable and Linux process spawning is cheap. On
+Windows, where a process spawn is expensive and an antivirus scanner reads
+every file each git touches, fifty of them is seconds. That is the shape of
+the five-second start reported there.
+
+It also contradicts how this configuration treats plugins: they are pinned by
+lazy-lock.json and updating them is a deliberate act. `:Lazy check` asks the
+same question at a moment of your choosing.
+
+**Not verified on Windows.** This is a measured cause with a plausible
+mechanism, not a confirmed fix. It needs one start on that machine to say.
