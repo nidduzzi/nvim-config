@@ -51,6 +51,10 @@ end)
 -- `v` at the prompt to view the file before deciding.
 opt.exrc = true
 
+-- A modeline is configuration in a file you opened, applied by opening it.
+-- Nothing here needs it, and a repository should not get to set options.
+opt.modeline = false
+
 -- A project file can set these. Defaults live next to the code that reads
 -- them, so a project only has to state what differs:
 --

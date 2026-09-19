@@ -84,7 +84,7 @@ function M.check()
     "where only this project will use it, or anywhere on PATH.",
     "",
     "Project directories that are searched first:",
-    "  " .. table.concat(lsp.bin_dirs, "  "),
+    "  " .. table.concat(lsp.bin_dirs(lsp.root(vim.fn.getcwd())), "  "),
   }, "\n"))
 end
 

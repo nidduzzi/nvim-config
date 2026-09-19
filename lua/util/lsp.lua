@@ -31,18 +31,43 @@ local M = {}
 --- This list is about where tools live, not about which languages are
 --- supported: a server for any language is found as long as its executable
 --- ends up in one of these.
-M.bin_dirs = {
-  ".venv/bin", -- Python virtualenv
-  "venv/bin",
-  ".direnv/*/bin", -- direnv layouts
-  "node_modules/.bin", -- npm, pnpm, yarn
-  ".yarn/bin",
-  "vendor/bin", -- Composer
-  ".bundle/bin", -- Bundler
-  "bin", -- project-local scripts, Mix and Gradle wrappers
-  ".tools/bin",
-  "result/bin", -- Nix build output
+---@type { marker: string, bin: string, why: string }[]
+M.bin_evidence = {
+  { marker = "pyvenv.cfg", bin = "bin", why = "a Python virtualenv names itself" },
+  { marker = ".venv/pyvenv.cfg", bin = ".venv/bin", why = "a Python virtualenv in the usual place" },
+  { marker = "venv/pyvenv.cfg", bin = "venv/bin", why = "a Python virtualenv in the other usual place" },
+  { marker = "package.json", bin = "node_modules/.bin", why = "npm, pnpm and yarn all install here" },
+  { marker = "composer.json", bin = "vendor/bin", why = "Composer's documented location" },
+  { marker = "Gemfile", bin = ".bundle/bin", why = "Bundler's binstubs" },
+  { marker = ".envrc", bin = ".direnv/*/bin", why = "direnv's layout directory" },
 }
+
+---@param root string
+---@return string[]
+function M.bin_dirs(root)
+  local found = {}
+  local seen = {}
+
+  local activated = vim.env.VIRTUAL_ENV
+  if activated and activated ~= "" and vim.startswith(activated, root) then
+    found[#found + 1] = vim.fs.relpath(root, activated .. "/bin") or (activated .. "/bin")
+    seen[found[#found]] = true
+  end
+
+  for _, evidence in ipairs(M.bin_evidence) do
+    local marker = vim.fn.glob(root .. "/" .. evidence.marker, false, true)
+    if #marker > 0 and not seen[evidence.bin] then
+      seen[evidence.bin] = true
+      found[#found + 1] = evidence.bin
+    end
+  end
+
+  if vim.uv.fs_stat(root .. "/result/bin") and not seen["result/bin"] then
+    found[#found + 1] = "result/bin"
+  end
+
+  return found
+end
 
 --- Files that mean "the directory containing me is a project root".
 M.root_markers = {
@@ -115,7 +140,7 @@ function M.project_bin(name, start)
   local root = M.root(start or vim.fn.getcwd())
   local trusted = may_run_project_bin(root)
 
-  for _, dir in ipairs(M.bin_dirs) do
+  for _, dir in ipairs(M.bin_dirs(root)) do
     for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/" .. name, false, true)) do
       if vim.fn.executable(candidate) == 1 then
         if not trusted then

@@ -165,6 +165,15 @@ function M.ask(prompt, opts)
     return
   end
 
+  if rung == "edit" and not require("util.trust").is_trusted(M.root()) then
+    vim.notify(
+      "The edit rung lets the agent write files, and this project is not trusted.\n\nCode it reads can carry instructions, so a project you have not vouched for should not be able to steer a writing agent. :DotfilesTrustProject, or step down with <leader>a-.",
+      vim.log.levels.ERROR,
+      { title = "Untrusted project" }
+    )
+    return
+  end
+
   local can, why_not = backends.supports(backend, rung)
   if not can then
     vim.notify(why_not or "That rung is unavailable.", vim.log.levels.ERROR, { title = "Agent" })

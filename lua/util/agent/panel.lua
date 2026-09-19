@@ -39,7 +39,7 @@ function M.show(title, text, opts)
   for _, line in ipairs(lines) do
     height = height + math.max(1, math.ceil(vim.fn.strdisplaywidth(line) / (width - 2)))
   end
-  height = math.min(height, math.floor(vim.o.lines * 0.6))
+  height = math.min(height, math.floor(vim.o.lines * 0.8))
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
