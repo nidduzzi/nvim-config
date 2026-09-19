@@ -52,6 +52,12 @@ M.defaults = {
 
   -- Language servers this project should not start even if they are present.
   lsp_ignore = {},
+
+  -- Whether a language server found inside the project may be run. A program
+  -- in a repository runs as you do, with your environment, so cloning one and
+  -- opening a file is enough. "ask" runs it only for a project trusted with
+  -- :DotfilesTrustProject.
+  lsp_project_bin = "ask",
 }
 
 --- Every settable name, including the ones whose default is nil and so cannot
@@ -66,6 +72,7 @@ M.names = {
   "agent_timeout",
   "search_preset",
   "lsp_ignore",
+  "lsp_project_bin",
 }
 
 --- Set for this session only. Nothing is written to disk.

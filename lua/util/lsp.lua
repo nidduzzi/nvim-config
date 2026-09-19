@@ -75,12 +75,53 @@ end
 ---@param name string
 ---@param start? string directory to search from. Default: the current one.
 ---@return string|nil path an absolute path, or nil when the project has none
+---@param root string
+---@return boolean
+local function may_run_project_bin(root)
+  local allowed = require("util.settings").get("lsp_project_bin")
+  if allowed == true then
+    return true
+  end
+  if allowed == false then
+    return false
+  end
+  return require("util.trust").is_trusted(root)
+end
+
+---@type table<string, boolean>
+local refused = {}
+
+---@param root string
+---@param candidate string
+local function say_refused(root, candidate)
+  if refused[root] then
+    return
+  end
+  refused[root] = true
+
+  vim.schedule(function()
+    vim.notify(
+      ("%s ships its own %s.\n\nIt was not started: a program from a repository runs as you do, with your environment. :DotfilesTrustProject to allow this one, or set lsp_project_bin."):format(
+        vim.fn.fnamemodify(root, ":~"),
+        vim.fn.fnamemodify(candidate, ":t")
+      ),
+      vim.log.levels.WARN,
+      { title = "Untrusted project" }
+    )
+  end)
+end
+
 function M.project_bin(name, start)
   local root = M.root(start or vim.fn.getcwd())
+  local trusted = may_run_project_bin(root)
 
   for _, dir in ipairs(M.bin_dirs) do
     for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/" .. name, false, true)) do
       if vim.fn.executable(candidate) == 1 then
+        if not trusted then
+          say_refused(root, candidate)
+          return nil
+        end
         return candidate
       end
     end
