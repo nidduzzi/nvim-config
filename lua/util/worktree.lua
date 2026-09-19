@@ -137,11 +137,7 @@ function M.add(branch, opts)
   local result = vim.system(vim.list_extend({ "git" }, args), { text = true }):wait()
 
   if result.code ~= 0 then
-    vim.notify(
-      (result.stderr or "git worktree add failed"):gsub("%s+$", ""),
-      vim.log.levels.ERROR,
-      { title = "Worktree" }
-    )
+    vim.notify((result.stderr or "git worktree add failed"):gsub("%s+$", ""), vim.log.levels.ERROR, { title = "Worktree" })
     return
   end
 

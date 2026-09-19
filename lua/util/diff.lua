@@ -58,18 +58,16 @@ function M.toggle_merge()
   end
 
   if #conflicts == 0 then
-    vim.notify(
-      "No conflicts to resolve.\nOpening the working tree diff instead.",
-      vim.log.levels.INFO,
-      { title = "Diff" }
-    )
+    vim.notify("No conflicts to resolve.\nOpening the working tree diff instead.", vim.log.levels.INFO, { title = "Diff" })
     vim.cmd("DiffviewOpen")
     return
   end
 
   vim.notify(
-    ("%d file%s with conflicts.\n\nIn the middle file: <leader>co takes ours, <leader>ct theirs,\n<leader>cb the base, <leader>ca all of them, dx none.\n]x and [x jump between conflicts.")
-      :format(#conflicts, #conflicts == 1 and "" or "s"),
+    ("%d file%s with conflicts.\n\nIn the middle file: <leader>co takes ours, <leader>ct theirs,\n<leader>cb the base, <leader>ca all of them, dx none.\n]x and [x jump between conflicts."):format(
+      #conflicts,
+      #conflicts == 1 and "" or "s"
+    ),
     vim.log.levels.INFO,
     { title = "Merge conflicts" }
   )

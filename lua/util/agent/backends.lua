@@ -375,9 +375,7 @@ function M.resolve(name)
     return nil, ("There is no backend called %q. Known: claude, hermes, codex."):format(name)
   end
   if vim.fn.executable(backend.cmd) ~= 1 then
-    return nil, ("%s is not on PATH. This drives a CLI rather than an API, so there is nothing to fall back to."):format(
-      backend.cmd
-    )
+    return nil, ("%s is not on PATH. This drives a CLI rather than an API, so there is nothing to fall back to."):format(backend.cmd)
   end
   return backend, nil
 end

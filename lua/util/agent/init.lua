@@ -124,11 +124,7 @@ end
 function M.reset()
   local root = M.root()
   os.remove(session_file(root))
-  vim.notify(
-    "Starting a new conversation for " .. vim.fn.fnamemodify(root, ":~"),
-    vim.log.levels.INFO,
-    { title = "Agent" }
-  )
+  vim.notify("Starting a new conversation for " .. vim.fn.fnamemodify(root, ":~"), vim.log.levels.INFO, { title = "Agent" })
 end
 
 --- Take down the pending toast.
@@ -162,9 +158,7 @@ function M.ask(prompt, opts)
   -- this file quietly doing something it makes no promise about.
   if not backends.is_ours(rung) then
     vim.notify(
-      ("The %s rung is sidekick.nvim's terminal, not this. Open it with <leader>an, or step back down with <leader>a-."):format(
-        rung
-      ),
+      ("The %s rung is sidekick.nvim's terminal, not this. Open it with <leader>an, or step back down with <leader>a-."):format(rung),
       vim.log.levels.WARN,
       { title = "Agent" }
     )
@@ -203,11 +197,7 @@ function M.ask(prompt, opts)
       )
       return
     end
-    vim.notify(
-      ("%s is unproven: nothing here can stop it writing."):format(backend.label),
-      vim.log.levels.WARN,
-      { title = "Agent" }
-    )
+    vim.notify(("%s is unproven: nothing here can stop it writing."):format(backend.label), vim.log.levels.WARN, { title = "Agent" })
   end
 
   if running then
@@ -241,21 +231,13 @@ function M.ask(prompt, opts)
       dismiss(notice)
 
       if result.code ~= 0 then
-        vim.notify(
-          ("%s exited %d\n%s"):format(backend.label, result.code, vim.trim(result.stderr or "")),
-          vim.log.levels.ERROR,
-          { title = "Agent" }
-        )
+        vim.notify(("%s exited %d\n%s"):format(backend.label, result.code, vim.trim(result.stderr or "")), vim.log.levels.ERROR, { title = "Agent" })
         return
       end
 
       local answer = backend:parse(result.stdout or "")
       if not answer then
-        vim.notify(
-          ("Could not read %s's answer."):format(backend.label),
-          vim.log.levels.ERROR,
-          { title = "Agent" }
-        )
+        vim.notify(("Could not read %s's answer."):format(backend.label), vim.log.levels.ERROR, { title = "Agent" })
         return
       end
 
@@ -323,11 +305,7 @@ function M.trust(to, by)
       return
     end
     if not vim.tbl_contains(backends.rungs, choice) then
-      vim.notify(
-        ("There is no %q rung. Known: %s."):format(choice, table.concat(backends.rungs, ", ")),
-        vim.log.levels.ERROR,
-        { title = "Agent" }
-      )
+      vim.notify(("There is no %q rung. Known: %s."):format(choice, table.concat(backends.rungs, ", ")), vim.log.levels.ERROR, { title = "Agent" })
       return
     end
 
@@ -380,9 +358,7 @@ function M.report()
     table.concat({
       ("agent: %s"):format(backend and backend.label or M.config.backend),
       ("rung: %s — %s"):format(M.config.trust, backends.rung_desc[M.config.trust] or ""),
-      ("guarantee: %s"):format(
-        (backend and (backend.rung_proof or {})[M.config.trust]) or "NOT VERIFIED for this rung"
-      ),
+      ("guarantee: %s"):format((backend and (backend.rung_proof or {})[M.config.trust]) or "NOT VERIFIED for this rung"),
       ("calls this session: %d"):format(M.spend.calls),
       ("spent: %s"):format(M.spend.usd > 0 and ("$%.4f"):format(M.spend.usd) or "not reported by this agent"),
       ("last call: %s"):format(M.spend.last_ms and (M.spend.last_ms .. "ms") or "none yet"),

@@ -313,11 +313,7 @@ function M.set_unique(mode, lhs, rhs, opts)
   local ok, err = pcall(vim.keymap.set, mode, lhs, rhs, opts)
 
   if not ok then
-    vim.notify(
-      ("%s is already taken, so it was left alone.\n\n%s"):format(lhs, err),
-      vim.log.levels.WARN,
-      { title = "Key not bound" }
-    )
+    vim.notify(("%s is already taken, so it was left alone.\n\n%s"):format(lhs, err), vim.log.levels.WARN, { title = "Key not bound" })
   end
 
   return ok

@@ -61,11 +61,7 @@ return {
           end
 
           if rung == "normal" then
-            vim.notify(
-              "Opening the CLI with its own defaults. Nothing here limits what it can do.",
-              vim.log.levels.WARN,
-              { title = "Agent" }
-            )
+            vim.notify("Opening the CLI with its own defaults. Nothing here limits what it can do.", vim.log.levels.WARN, { title = "Agent" })
           end
           require("sidekick.cli").toggle(backends.terminal_name(name, rung))
         end,

@@ -450,17 +450,10 @@ function M.toggle_case(picker)
   end
 
   picker.opts.args = args
-  picker.title = ("Grep (%s%s)"):format(
-    picker.opts.search_preset or "code",
-    insensitive and "" or ", any case"
-  )
+  picker.title = ("Grep (%s%s)"):format(picker.opts.search_preset or "code", insensitive and "" or ", any case")
   picker:find({ refresh = true })
 
-  vim.notify(
-    insensitive and "Case matters again (smart-case)." or "Ignoring case.",
-    vim.log.levels.INFO,
-    { title = "Search" }
-  )
+  vim.notify(insensitive and "Case matters again (smart-case)." or "Ignoring case.", vim.log.levels.INFO, { title = "Search" })
 end
 
 --- Options to open a grep picker with a preset already applied.

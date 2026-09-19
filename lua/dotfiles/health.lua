@@ -51,12 +51,7 @@ function M.check()
     elseif info.status == "PATH" then
       vim.health.ok(("%s — from PATH: %s"):format(name, vim.fn.exepath(info.cmd[1])))
     else
-      vim.health.info(
-        ("%s — not provided here, so it will not start (%s)"):format(
-          name,
-          filetypes ~= "" and filetypes or "no filetypes declared"
-        )
-      )
+      vim.health.info(("%s — not provided here, so it will not start (%s)"):format(name, filetypes ~= "" and filetypes or "no filetypes declared"))
     end
   end
 
@@ -67,13 +62,7 @@ function M.check()
     vim.health.ok("Nothing has overwritten a mapping since startup.")
   else
     for _, entry in ipairs(overwrites) do
-      local line = ("%s (%s) was %q, now %q — %s"):format(
-        entry.lhs,
-        entry.mode,
-        entry.before,
-        entry.after,
-        entry.who
-      )
+      local line = ("%s (%s) was %q, now %q — %s"):format(entry.lhs, entry.mode, entry.before, entry.after, entry.who)
 
       -- Three kinds, and only the last is a problem. A plugin refining its own
       -- key is ordinary; this config taking a key is a decision already made;

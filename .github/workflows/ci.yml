@@ -1,0 +1,82 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
+          args: --check lua tests
+
+  no-debug-calls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: reject leftover dd() calls
+        run: |
+          if grep -rnP '^(?!\s*--).*\bdd\(' lua tests; then
+            echo "dd() is a debug call; remove it before merging."
+            exit 1
+          fi
+
+  specs:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim }}
+      - uses: actions/cache@v4
+        with:
+          path: .tests
+          key: tests-${{ matrix.neovim }}-${{ hashFiles('lazy-lock.json', 'tests/minit.lua') }}
+      - run: ./scripts/test
+
+  boot:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: ${{ matrix.neovim }}
+      - name: install plugins at the pinned commits
+        env:
+          XDG_CONFIG_HOME: ${{ github.workspace }}/.ci/config
+          XDG_DATA_HOME: ${{ github.workspace }}/.ci/data
+          XDG_STATE_HOME: ${{ github.workspace }}/.ci/state
+          NVIM_APPNAME: nvim-ci
+        run: |
+          mkdir -p "$XDG_CONFIG_HOME"
+          ln -s "$GITHUB_WORKSPACE" "$XDG_CONFIG_HOME/nvim-ci"
+          nvim --headless "+Lazy! restore" +qa
+      - name: start and report health
+        env:
+          XDG_CONFIG_HOME: ${{ github.workspace }}/.ci/config
+          XDG_DATA_HOME: ${{ github.workspace }}/.ci/data
+          XDG_STATE_HOME: ${{ github.workspace }}/.ci/state
+          NVIM_APPNAME: nvim-ci
+        run: |
+          nvim --headless "+checkhealth dotfiles" "+w! health.log" +qa
+          cat health.log
+          if grep -q '^ *- ERROR' health.log; then
+            echo "checkhealth dotfiles reported an error."
+            exit 1
+          fi

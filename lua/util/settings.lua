@@ -99,11 +99,7 @@ local function machine()
       from_file = loaded
     elseif not ok then
       vim.schedule(function()
-        vim.notify(
-          ("%s could not be read:\n%s"):format(path, tostring(loaded)),
-          vim.log.levels.ERROR,
-          { title = "Settings" }
-        )
+        vim.notify(("%s could not be read:\n%s"):format(path, tostring(loaded)), vim.log.levels.ERROR, { title = "Settings" })
       end)
     end
   end

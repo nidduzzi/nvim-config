@@ -74,11 +74,7 @@ function M.next(question)
   end
 
   if at.rung >= #M.rungs then
-    vim.notify(
-      "That is the last rung. Nothing further is coming — write it, then review it with <leader>ar.",
-      vim.log.levels.WARN,
-      { title = "Hint" }
-    )
+    vim.notify("That is the last rung. Nothing further is coming — write it, then review it with <leader>ar.", vim.log.levels.WARN, { title = "Hint" })
     return
   end
 
@@ -111,11 +107,7 @@ function M.next(question)
     uses_code = true,
     label = ("Hint %d of %d"):format(at.rung, #M.rungs),
     on_done = function(text)
-      panel.show(
-        ("Hint %d of %d — %s"):format(at.rung, #M.rungs, rung.name),
-        text,
-        { footer = at.rung < #M.rungs and "press again for more" or "last rung" }
-      )
+      panel.show(("Hint %d of %d — %s"):format(at.rung, #M.rungs, rung.name), text, { footer = at.rung < #M.rungs and "press again for more" or "last rung" })
     end,
   })
 end

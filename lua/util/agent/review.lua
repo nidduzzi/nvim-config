@@ -267,9 +267,7 @@ function M.run()
       -- spent an afternoon being read as "Nothing found in function".
       if not structured or type(structured.findings) ~= "table" then
         vim.notify(
-          ("Could not read the answer, so nothing was checked.\n\n%s"):format(
-            vim.trim(text or ""):sub(1, 300)
-          ),
+          ("Could not read the answer, so nothing was checked.\n\n%s"):format(vim.trim(text or ""):sub(1, 300)),
           vim.log.levels.ERROR,
           { title = "Review failed" }
         )
@@ -280,11 +278,7 @@ function M.run()
 
       if #findings == 0 then
         M.clear(ctx.bufnr)
-        vim.notify(
-          ("Nothing found in %s. <a-s> from the findings list widens the scope."):format(scope.name),
-          vim.log.levels.INFO,
-          { title = "Review" }
-        )
+        vim.notify(("Nothing found in %s. <a-s> from the findings list widens the scope."):format(scope.name), vim.log.levels.INFO, { title = "Review" })
         return
       end
 

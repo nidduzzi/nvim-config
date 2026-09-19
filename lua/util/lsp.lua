@@ -277,8 +277,10 @@ function M.warn_missing(filetype)
   -- rust_analyzer and clangd are never configured and so were never "missing".
   if not configured then
     vim.notify(
-      ("No language server for %s, and none is configured for it.\n\n:LazyExtras adds language support — look for lang.%s.\nA server already on PATH is picked up without one.")
-        :format(filetype, filetype),
+      ("No language server for %s, and none is configured for it.\n\n:LazyExtras adds language support — look for lang.%s.\nA server already on PATH is picked up without one."):format(
+        filetype,
+        filetype
+      ),
       vim.log.levels.WARN,
       { title = "Language servers" }
     )
@@ -292,8 +294,10 @@ function M.warn_missing(filetype)
   table.sort(missing)
 
   vim.notify(
-    ("No language server for %s.\n\nConfigured but not provided by this project or PATH:\n  %s\n\nInstall one in the project, or on PATH, and restart.\n:checkhealth dotfiles lists them.")
-      :format(filetype, table.concat(missing, ", ")),
+    ("No language server for %s.\n\nConfigured but not provided by this project or PATH:\n  %s\n\nInstall one in the project, or on PATH, and restart.\n:checkhealth dotfiles lists them."):format(
+      filetype,
+      table.concat(missing, ", ")
+    ),
     vim.log.levels.WARN,
     { title = "Language servers" }
   )
