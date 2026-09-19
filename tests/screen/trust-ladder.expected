@@ -1,0 +1,24 @@
+                      ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗   ███╗          Z
+                      ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████╗ ████║      Z
+                      ██║     ███████║  ███╔╝  ╚████╔╝ ██║   ██║██║██╔████╔██║   z
+                      ██║     ██╔══██║ ███╔╝    ╚██╔╝  ╚██╗ ██╔╝██║██║╚██╔╝██║ z
+                      ███████╗██║  ██║███████╗   ██║    ╚████╔╝ ██║██║ ╚═╝ ██║
+                      ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝     ╚═╝
+
+         ╭────────────────────────── How much may the agent do? ──────────────────────────╮
+         │                                                                           5/5 │
+         │────────────────────────────────────────────────────────────────────────────────│
+         │ 1. chat     no tools, and none of your code — you explain it                   │
+         │ 2. context  no tools; the editor puts the code in the prompt                   │
+         │ 3. explore  reads and greps for itself; cannot write                           │
+         │ 4. edit     reads and writes files; still no shell                             │
+         │ 5. normal   sidekick.nvim's terminal, with the agent's own defaults            │
+         ╰────────────────────────────────────────────────────────────────────────────────╯
+
+                       Config                                         <leader>fc
+
+                       Restore Session                                <leader>qs
+
+                       What can this editor do                         <leader>?
+
+ INSERT   BRANCH                                                            Top   1:1    HH:MM

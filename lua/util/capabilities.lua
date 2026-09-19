@@ -429,7 +429,13 @@ function M.keymaps()
   end
 
   table.sort(items, function(a, b)
-    return a.key < b.key
+    if a.key ~= b.key then
+      return a.key < b.key
+    end
+    if a.desc ~= b.desc then
+      return a.desc < b.desc
+    end
+    return a.name < b.name
   end)
 
   return items
