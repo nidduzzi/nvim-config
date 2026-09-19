@@ -140,6 +140,36 @@ local function dismiss(notice)
   end)
 end
 
+--- Why this request will not be sent, and how loudly to say so.
+---@param backend agent.Backend
+---@param rung string
+---@param opts { uses_code?: boolean }
+---@param root? string
+---@return string|nil reason
+---@return integer level
+function M.refusal(backend, rung, opts, root)
+  if not backends.is_ours(rung) then
+    return ("The %s rung is sidekick.nvim's terminal, not this. Open it with <leader>an, or step back down with <leader>a-."):format(rung), vim.log.levels.WARN
+  end
+
+  if rung == "edit" and not require("util.trust").is_trusted(root or M.root()) then
+    return "The edit rung lets the agent write files, and this project is not trusted.\n\nCode it reads can carry instructions, so a project you have not vouched for should not be able to steer a writing agent. :DotfilesTrustProject, or step down with <leader>a-.",
+      vim.log.levels.ERROR
+  end
+
+  local can, why_not = backends.supports(backend, rung)
+  if not can then
+    return why_not or "That rung is unavailable.", vim.log.levels.ERROR
+  end
+
+  if opts.uses_code and not backends.sends_context(rung) then
+    return "The chat rung sends none of your code, so there is nothing here to review or explain.\n\nAsk a question with <leader>aa, or step up to context with <leader>a+.",
+      vim.log.levels.WARN
+  end
+
+  return nil, vim.log.levels.INFO
+end
+
 --- Ask the configured agent something, with exactly the tools the current rung
 --- allows and no more.
 ---
@@ -154,41 +184,9 @@ function M.ask(prompt, opts)
 
   local rung = M.config.trust
 
-  -- The top rung is a terminal someone else runs. Answering it here would be
-  -- this file quietly doing something it makes no promise about.
-  if not backends.is_ours(rung) then
-    vim.notify(
-      ("The %s rung is sidekick.nvim's terminal, not this. Open it with <leader>an, or step back down with <leader>a-."):format(rung),
-      vim.log.levels.WARN,
-      { title = "Agent" }
-    )
-    return
-  end
-
-  if rung == "edit" and not require("util.trust").is_trusted(M.root()) then
-    vim.notify(
-      "The edit rung lets the agent write files, and this project is not trusted.\n\nCode it reads can carry instructions, so a project you have not vouched for should not be able to steer a writing agent. :DotfilesTrustProject, or step down with <leader>a-.",
-      vim.log.levels.ERROR,
-      { title = "Untrusted project" }
-    )
-    return
-  end
-
-  local can, why_not = backends.supports(backend, rung)
-  if not can then
-    vim.notify(why_not or "That rung is unavailable.", vim.log.levels.ERROR, { title = "Agent" })
-    return
-  end
-
-  -- On the first rung the agent sees no code at all, so the modes that exist
-  -- to talk about code have nothing to say. Refusing is the point of the rung
-  -- rather than a limitation of it: the explaining is yours to do.
-  if opts.uses_code and not backends.sends_context(rung) then
-    vim.notify(
-      "The chat rung sends none of your code, so there is nothing here to review or explain.\n\nAsk a question with <leader>aa, or step up to context with <leader>a+.",
-      vim.log.levels.WARN,
-      { title = "Agent" }
-    )
+  local refusal, level = M.refusal(backend, rung, opts)
+  if refusal then
+    vim.notify(refusal, level, { title = "Agent" })
     return
   end
 
