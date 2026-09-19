@@ -25,3 +25,25 @@ vim.api.nvim_create_autocmd("FileType", {
     end, 2000)
   end,
 })
+
+vim.api.nvim_create_user_command("DotfilesTrustProject", function()
+  local lsp = require("util.lsp")
+  local trust = require("util.trust")
+  local root = lsp.root(vim.fn.getcwd())
+
+  trust.allow(root)
+  vim.notify(
+    ("%s is trusted to run its own programs.\n\n:DotfilesRevokeProject undoes it."):format(vim.fn.fnamemodify(root, ":~")),
+    vim.log.levels.INFO,
+    { title = "Trusted project" }
+  )
+end, { desc = "Let this project run the language servers it ships" })
+
+vim.api.nvim_create_user_command("DotfilesRevokeProject", function()
+  local lsp = require("util.lsp")
+  local trust = require("util.trust")
+  local root = lsp.root(vim.fn.getcwd())
+
+  trust.revoke(root)
+  vim.notify(("%s is no longer trusted."):format(vim.fn.fnamemodify(root, ":~")), vim.log.levels.INFO, { title = "Trusted project" })
+end, { desc = "Stop letting this project run the programs it ships" })

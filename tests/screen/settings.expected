@@ -1,0 +1,24 @@
+                      ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗   ███╗          Z
+                      ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████╗ ████║      Z
+                      ██║     ███████║  ███╔╝  ╚████╔╝ ██║   ██║██║██╔████╔██║   z
+                      ██║     ██╔══██║ ███╔╝    ╚██╔╝  ╚██╗ ██╔╝██║██║╚██╔╝██║ z
+                      ███████╗██║  ██║███████╗   ██║    ╚████╔╝ ██║██║ ╚═╝ ██║
+                      ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝     ╚═╝
+
+                       ╭ Settings ──────────────────────────────────────────────────╮
+                       │Settings, and where each value came from:                   │
+                       │                                                            │
+                       │agent_allow_unproven  false    built in                     │
+                       │agent_backend         claude   built in                     │
+                       │agent_model           (unset)  the backend decides          │
+                       │agent_timeout         90000    built in                     │
+                       │agent_trust           context  built in                     │
+                       │lsp_ignore            {}       built in                     │
+                       │lsp_project_bin       ask      built in                     │
+                       │search_preset         code     built in                     │
+                       │                                                            │
+                       │Machine-local file: CONFIG/nvim-lazyvim/local.│
+                       │lua                                                         │
+                       │A project overrides it through vim.g.<name> in its .nvim.   │
+                       │lua.                                                        │
+ ╰──────────────────────────────────────────────── a-q closes ╯

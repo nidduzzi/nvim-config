@@ -4,9 +4,31 @@
 
 return {
   -- Yank history, so a yank three yanks ago is still reachable.
+  --
+  -- The picker is yanky's own. It registers itself as a snacks source when it
+  -- loads after snacks, which this configuration spent 91 lines reimplementing
+  -- on the belief that `Snacks.picker.yanky()` did not exist. It does not exist
+  -- in snacks — snacks has no yank-ring source — but yanky adds it, and the
+  -- pinned version shipped it the whole time.
+  --
+  -- One deliberate difference is kept: choosing an entry loads the register and
+  -- stops there. yanky's own confirm pastes, and a picker that edits the buffer
+  -- the moment you press enter is the thing that fails on an unwritable one.
+  -- Loading the register leaves the paste in your hands, with p or P, at the
+  -- position you meant. That is a two-line override of one action rather than a
+  -- picker of our own.
   {
     "gbprod/yanky.nvim",
-    dependencies = { "kkharji/sqlite.lua" },
+    dependencies = { "kkharji/sqlite.lua", "folke/snacks.nvim" },
+    config = function(_, opts)
+      require("yanky").setup(opts)
+
+      local source = Snacks and Snacks.picker and Snacks.picker.sources and Snacks.picker.sources.yanky
+      if source then
+        source.actions = source.actions or {}
+        source.actions.confirm = source.actions.set_default_register
+      end
+    end,
     opts = {
       ring = {
         history_length = 100,
@@ -75,20 +97,29 @@ return {
   -- Each key toggles: press it to open the view, press the same key again to
   -- close it. Diffview opens in a tab of its own, so without that you end up
   -- hunting for :DiffviewClose or leaving stray tabs behind.
+  --
+  -- The fork rather than sindrets/diffview.nvim, for two reasons that are the
+  -- same reason. Upstream has not been pushed since 2024-08 and its "is this
+  -- repo active?" issue is unanswered; and the fork ships `:DiffviewToggle`,
+  -- which is exactly the open-outside-close-inside behaviour this configuration
+  -- had written by hand. The module path is unchanged, so `require("diffview")`
+  -- and every action name still resolve.
   {
-    "sindrets/diffview.nvim",
-    cmd = { "DiffviewOpen", "DiffviewFileHistory", "DiffviewClose" },
+    "dlyongemallo/diffview-plus.nvim",
+    cmd = { "DiffviewOpen", "DiffviewToggle", "DiffviewFileHistory", "DiffviewClose" },
     keys = {
       {
         "<leader>gd",
-        function()
-          require("util.diff").toggle("DiffviewOpen")
-        end,
+        "<cmd>DiffviewToggle<cr>",
         desc = "Diff: working tree (toggle)",
       },
       {
         "<leader>gf",
         function()
+          -- Not DiffviewToggle: that one is an alias for DiffviewOpen and
+          -- takes its arguments, and there is no file-history toggle. The
+          -- documented command list has DiffviewFileHistory and no toggling
+          -- form of it.
           require("util.diff").toggle("DiffviewFileHistory %")
         end,
         desc = "Diff: history of this file (toggle)",

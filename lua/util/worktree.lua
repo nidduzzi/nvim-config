@@ -125,6 +125,11 @@ function M.add(branch, opts)
   local args = { "worktree", "add" }
   if opts.new then
     vim.list_extend(args, { "-b", branch, path })
+    -- Without a base, git branches off whatever HEAD happens to be, which is
+    -- rarely what was meant when the worktree is being made from a picker.
+    if opts.base and opts.base ~= "" then
+      table.insert(args, opts.base)
+    end
   else
     vim.list_extend(args, { path, branch })
   end
@@ -132,11 +137,7 @@ function M.add(branch, opts)
   local result = vim.system(vim.list_extend({ "git" }, args), { text = true }):wait()
 
   if result.code ~= 0 then
-    vim.notify(
-      (result.stderr or "git worktree add failed"):gsub("%s+$", ""),
-      vim.log.levels.ERROR,
-      { title = "Worktree" }
-    )
+    vim.notify((result.stderr or "git worktree add failed"):gsub("%s+$", ""), vim.log.levels.ERROR, { title = "Worktree" })
     return
   end
 
@@ -202,10 +203,15 @@ function M.pick()
       end,
       worktree_new = function(picker)
         picker:close()
-        vim.ui.input({ prompt = "New branch, with a worktree for it: " }, function(branch)
-          if branch and branch ~= "" then
-            M.add(branch, { new = true })
-          end
+        -- Ask what to base it on before asking what to call it. A new branch
+        -- always comes off something, and answering that from memory is how
+        -- you end up branching off whatever happened to be checked out.
+        M.pick_branch(function(base)
+          vim.ui.input({ prompt = ("New branch off %s: "):format(base or "HEAD") }, function(branch)
+            if branch and branch ~= "" then
+              M.add(branch, { new = true, base = base })
+            end
+          end)
         end)
       end,
     },
@@ -219,7 +225,11 @@ function M.pick()
 end
 
 --- Pick a branch, and put a worktree on it.
-function M.pick_branch()
+---
+--- With `on_pick`, the branch is handed back instead, which is how choosing a
+--- base for a new branch reuses this list rather than growing a second one.
+---@param on_pick? fun(branch: string)
+function M.pick_branch(on_pick)
   local lines, ok = git({ "branch", "--all", "--format=%(refname:short)" })
 
   if not ok or #lines == 0 then
@@ -247,7 +257,7 @@ function M.pick_branch()
   Snacks.picker.pick({
     source = "branches",
     items = items,
-    title = "A worktree for which branch?",
+    title = on_pick and "Base the new branch on which one?" or "A worktree for which branch?",
     layout = { preset = "select", layout = { width = 0.7, height = 0.6 } },
     format = function(item)
       return {
@@ -263,6 +273,14 @@ function M.pick_branch()
       if not item then
         return
       end
+
+      if on_pick then
+        -- A branch that already has a worktree is a perfectly good base, so
+        -- the "taken" note is information here rather than a refusal.
+        on_pick(item.branch)
+        return
+      end
+
       if item.taken then
         M.switch(item.taken)
         return

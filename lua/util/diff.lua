@@ -1,9 +1,21 @@
---- Open and close the diff views with the same key.
+--- Open and close the diff views that the plugin cannot toggle itself.
 ---
 --- Diffview opens in a tab of its own, so a plain "open" mapping leaves you
---- hunting for :DiffviewClose, or accumulating tabs. Each mapping here is a
+--- hunting for :DiffviewClose, or accumulating tabs. Every key here is a
 --- toggle: the key that opened the view closes it, from inside the view as
 --- well as from the file you started in.
+---
+--- The working-tree diff no longer goes through here. diffview-plus ships
+--- `:DiffviewToggle`, documented as an alias for `:DiffviewOpen` outside a
+--- Diffview tab and for `:DiffviewClose` inside one, which is this behaviour
+--- with none of this code.
+---
+--- It does not cover the other two, and the reason is worth writing down so
+--- nobody deletes them expecting it to. `:DiffviewToggle` takes `:DiffviewOpen`'s
+--- arguments, and file history is a separate command rather than an option of
+--- it: the documented list has `:DiffviewFileHistory` and no toggling form. The
+--- merge view is not a command at all, it is `:DiffviewOpen` plus knowing
+--- whether there is anything to resolve.
 
 local M = {}
 
@@ -46,18 +58,16 @@ function M.toggle_merge()
   end
 
   if #conflicts == 0 then
-    vim.notify(
-      "No conflicts to resolve.\nOpening the working tree diff instead.",
-      vim.log.levels.INFO,
-      { title = "Diff" }
-    )
+    vim.notify("No conflicts to resolve.\nOpening the working tree diff instead.", vim.log.levels.INFO, { title = "Diff" })
     vim.cmd("DiffviewOpen")
     return
   end
 
   vim.notify(
-    ("%d file%s with conflicts.\n\nIn the middle file: <leader>co takes ours, <leader>ct theirs,\n<leader>cb the base, <leader>ca all of them, dx none.\n]x and [x jump between conflicts.")
-      :format(#conflicts, #conflicts == 1 and "" or "s"),
+    ("%d file%s with conflicts.\n\nIn the middle file: <leader>co takes ours, <leader>ct theirs,\n<leader>cb the base, <leader>ca all of them, dx none.\n]x and [x jump between conflicts."):format(
+      #conflicts,
+      #conflicts == 1 and "" or "s"
+    ),
     vim.log.levels.INFO,
     { title = "Merge conflicts" }
   )

@@ -1,0 +1,12 @@
+# needs: lsp
+# attempts: 6
+# size: 100x24
+Space
+ff
+lib
+Enter
+/M.add
+Enter
+ww
+K
+K

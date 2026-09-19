@@ -1,0 +1,24 @@
+                      ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗   ███╗          Z
+                      ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████╗ ████║      Z
+         ╭────── [everything] features keymaps commands <Tab> scope <a-o> by action ──────╮
+         │ worktree                                                               15/TOTAL │
+         │────────────────────────────────────────────────────────────────────────────────│
+         │ ● Switch worktree                 <leader>gw          Another checkout of this │
+         │ ● Worktree for a branch           <leader>gW          Check a branch out beside│
+         │ ● Diff the working tree           <leader>gd          Side-by-side diff; the sa│
+         │ ○ Close whatever is open (works   <M-q>               everywhere, i mode       │
+         │ ○ Jump to a label. f and t work   F                   everywhere, n mode       │
+         │ ○ Jump to a label. f and t work   T                   everywhere, n mode       │
+         │ ○ Jump to a label. f and t work   f                   everywhere, x mode       │
+         │ ○ Jump to a label. f and t work   t                   everywhere, n mode       │
+         │ ● Grep, without documentation     <leader>sg          Search file contents, ski│
+         │ ○ Jump between matching keywords  %                   everywhere, n mode       │
+         │ ○ Jump between matching keywords  [%                  everywhere, n mode       │
+         │ ○ Jump between matching keywords  ]%                  everywhere, n mode       │
+         │ ○ Jump between matching keywords  a%                  everywhere, x mode       │
+         │ ○ Jump between matching keywords  g%                  everywhere, n mode       │
+         │ ● Close whatever is open          <c-c>               c-c returns to normal fro│
+         ╰────────────────────────────────────────────────────────────────────────────────╯
+                       What can this editor do                         <leader>?
+
+ INSERT   BRANCH    Top 1:9   HH:MM

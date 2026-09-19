@@ -32,11 +32,7 @@ return {
           function()
             require("harpoon"):list():add()
             local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":.")
-            vim.notify(
-              ("%s\npinned at %d"):format(name, #require("harpoon"):list().items),
-              vim.log.levels.INFO,
-              { title = "Harpoon" }
-            )
+            vim.notify(("%s\npinned at %d"):format(name, #require("harpoon"):list().items), vim.log.levels.INFO, { title = "Harpoon" })
           end,
           desc = "Pin this file",
         },

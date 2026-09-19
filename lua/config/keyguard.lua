@@ -85,13 +85,46 @@ end
 --- is not counted as a second overwrite of the same key.
 local inside_helper = false
 
+--- What a key does globally, ignoring any buffer-local mapping over it.
+---
+--- `vim.fn.maparg` is buffer-aware and answers with the buffer-local mapping
+--- when one exists, which makes it the wrong witness twice. It cannot tell a
+--- shadow from a replacement, and while a shadow is in place it reports the
+--- same answer before and after a global set — so a plugin replacing a global
+--- key while you sit in a diff view looked like no change at all.
+---@param mode string
+---@param lhs string
+---@return string
+local function global_map(mode, lhs)
+  local wanted = vim.fn.keytrans(vim.api.nvim_replace_termcodes(lhs, true, true, true))
+  for _, map in ipairs(vim.api.nvim_get_keymap(mode)) do
+    if vim.fn.keytrans(vim.api.nvim_replace_termcodes(map.lhs, true, true, true)) == wanted then
+      return summarise(map)
+    end
+  end
+  return ""
+end
+
+--- Whether the global mapping for this key is still what it was.
+---@param mode string
+---@param lhs string
+---@param previous string
+---@return boolean
+local function still_global(mode, lhs, previous)
+  return global_map(mode, lhs) == previous
+end
+
 --- Record one overwrite, and speak up when it takes a watched key.
 ---@param mode string
 ---@param lhs string
 ---@param before table|nil
 ---@param buffer boolean
+---@param mode string
+---@param lhs string
+---@param before table|string|nil
+---@param buffer integer|nil the buffer a buffer-local set applied to
 local function record(mode, lhs, before, buffer)
-  local previous = summarise(before)
+  local previous = type(before) == "string" and before or summarise(before)
   if previous == "" then
     return
   end
@@ -101,10 +134,24 @@ local function record(mode, lhs, before, buffer)
   -- every time, which is what the first version of this did.
   local who, mine = caller()
 
-  -- What the key became is only knowable after the set has happened.
+  -- What the key became is only knowable after the set has happened. A global
+  -- set is judged against the global table, for the reason in global_map.
   vim.schedule(function()
-    local now = vim.fn.maparg(lhs, mode, false, true)
-    local after = summarise(now)
+    -- Read a buffer-local mapping in the buffer it was set for. This runs on
+    -- the next tick, by which time the current buffer may be something else
+    -- entirely — and then maparg answers about the wrong buffer, finds the
+    -- global mapping unchanged, and concludes nothing happened.
+    local after
+    if buffer then
+      if not vim.api.nvim_buf_is_valid(buffer) then
+        return
+      end
+      vim.api.nvim_buf_call(buffer, function()
+        after = summarise(vim.fn.maparg(lhs, mode, false, true))
+      end)
+    else
+      after = global_map(mode, lhs)
+    end
 
     -- Replacing a mapping with the identical one is not an overwrite.
     if after == previous or after == "" then
@@ -125,6 +172,24 @@ local function record(mode, lhs, before, buffer)
       buffer = buffer,
     }
     table.insert(M.overwrites, entry)
+
+    -- A buffer-local mapping shadows the global one inside that buffer and
+    -- leaves it intact everywhere else. That is not the loss this watches for,
+    -- and reporting it as one was wrong twice over: `maparg` answers with the
+    -- buffer-local mapping when there is one, so the "now" it read was the
+    -- shadow while the global key it claimed had been taken was still bound.
+    --
+    -- Diffview is the honest case. It binds <leader>gd, <leader>gm and
+    -- <leader>e inside its own two windows, from file.lua and panel.lua, so
+    -- opening a diff produced six warnings about three keys that all still
+    -- worked the moment you left the diff.
+    --
+    -- So a shadow is only news when the global mapping is gone as well. The
+    -- global table is asked directly, because `maparg` cannot be.
+    if entry.buffer and still_global(mode, lhs, previous) then
+      entry.shadow = true
+      return
+    end
 
     -- A key this config takes on purpose is not the fault being watched for.
     -- The watch list names the keys this config owns, so its own deliberate
@@ -147,13 +212,32 @@ function M.setup()
   ---@diagnostic disable-next-line: duplicate-set-field
   vim.keymap.set = function(mode, lhs, rhs, opts)
     local modes = type(mode) == "table" and mode or { mode }
-    local buffer = type(opts) == "table" and opts.buffer ~= nil
+
+    -- Which buffer, not merely whether. `buffer = true` and `buffer = 0` both
+    -- mean the current one, and it has to be resolved now rather than on the
+    -- next tick.
+    local buffer = nil
+    if type(opts) == "table" and opts.buffer ~= nil and opts.buffer ~= false then
+      buffer = (opts.buffer == true or opts.buffer == 0) and vim.api.nvim_get_current_buf() or opts.buffer
+    end
 
     for _, one in ipairs(modes) do
-      -- maparg answers for the current buffer, which is what the key will do.
-      local before = vim.fn.maparg(lhs, one, false, true)
-      if before and not vim.tbl_isempty(before) then
-        record(one, lhs, before, buffer)
+      -- A buffer-local set is judged by what the key does in this buffer,
+      -- which is what maparg answers. A global set is judged by the global
+      -- table, which is the only thing a global set can actually replace.
+      if buffer then
+        local before
+        vim.api.nvim_buf_call(buffer, function()
+          before = vim.fn.maparg(lhs, one, false, true)
+        end)
+        if before and not vim.tbl_isempty(before) then
+          record(one, lhs, before, buffer)
+        end
+      else
+        local before = global_map(one, lhs)
+        if before ~= "" then
+          record(one, lhs, before, false)
+        end
       end
     end
 
@@ -180,10 +264,25 @@ function M.setup()
         local args = { ... }
         local mode = is_buffer and args[2] or args[1]
         local lhs = is_buffer and args[3] or args[2]
+        -- nvim_buf_set_keymap takes the buffer first, and 0 means this one.
+        local buffer = nil
+        if is_buffer then
+          buffer = args[1] == 0 and vim.api.nvim_get_current_buf() or args[1]
+        end
 
-        local before = vim.fn.maparg(lhs, mode, false, true)
+        local before
+        if buffer then
+          if vim.api.nvim_buf_is_valid(buffer) then
+            vim.api.nvim_buf_call(buffer, function()
+              before = vim.fn.maparg(lhs, mode, false, true)
+            end)
+          end
+        else
+          before = vim.fn.maparg(lhs, mode, false, true)
+        end
+
         if before and not vim.tbl_isempty(before) then
-          record(mode, lhs, before, is_buffer)
+          record(mode, lhs, before, buffer)
         end
       end
 
@@ -214,11 +313,7 @@ function M.set_unique(mode, lhs, rhs, opts)
   local ok, err = pcall(vim.keymap.set, mode, lhs, rhs, opts)
 
   if not ok then
-    vim.notify(
-      ("%s is already taken, so it was left alone.\n\n%s"):format(lhs, err),
-      vim.log.levels.WARN,
-      { title = "Key not bound" }
-    )
+    vim.notify(("%s is already taken, so it was left alone.\n\n%s"):format(lhs, err), vim.log.levels.WARN, { title = "Key not bound" })
   end
 
   return ok

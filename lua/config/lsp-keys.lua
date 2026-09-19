@@ -86,14 +86,12 @@ function M.setup()
       -- Saying nothing is the behaviour that made these keys feel broken.
       local attached = vim.lsp.get_clients({ bufnr = 0 })
       local reason = #attached == 0 and "No language server is attached to this buffer."
-        or ("Attached here: %s — none of them can do this."):format(
-          table.concat(
-            vim.tbl_map(function(client)
-              return client.name
-            end, attached),
-            ", "
-          )
-        )
+        or ("Attached here: %s — none of them can do this."):format(table.concat(
+          vim.tbl_map(function(client)
+            return client.name
+          end, attached),
+          ", "
+        ))
 
       vim.notify(
         ("%s\n\n%s\n:checkhealth dotfiles lists what this project provides."):format(key.desc, reason),

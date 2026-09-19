@@ -31,18 +31,43 @@ local M = {}
 --- This list is about where tools live, not about which languages are
 --- supported: a server for any language is found as long as its executable
 --- ends up in one of these.
-M.bin_dirs = {
-  ".venv/bin", -- Python virtualenv
-  "venv/bin",
-  ".direnv/*/bin", -- direnv layouts
-  "node_modules/.bin", -- npm, pnpm, yarn
-  ".yarn/bin",
-  "vendor/bin", -- Composer
-  ".bundle/bin", -- Bundler
-  "bin", -- project-local scripts, Mix and Gradle wrappers
-  ".tools/bin",
-  "result/bin", -- Nix build output
+---@type { marker: string, bin: string, why: string }[]
+M.bin_evidence = {
+  { marker = "pyvenv.cfg", bin = "bin", why = "a Python virtualenv names itself" },
+  { marker = ".venv/pyvenv.cfg", bin = ".venv/bin", why = "a Python virtualenv in the usual place" },
+  { marker = "venv/pyvenv.cfg", bin = "venv/bin", why = "a Python virtualenv in the other usual place" },
+  { marker = "package.json", bin = "node_modules/.bin", why = "npm, pnpm and yarn all install here" },
+  { marker = "composer.json", bin = "vendor/bin", why = "Composer's documented location" },
+  { marker = "Gemfile", bin = ".bundle/bin", why = "Bundler's binstubs" },
+  { marker = ".envrc", bin = ".direnv/*/bin", why = "direnv's layout directory" },
 }
+
+---@param root string
+---@return string[]
+function M.bin_dirs(root)
+  local found = {}
+  local seen = {}
+
+  local activated = vim.env.VIRTUAL_ENV
+  if activated and activated ~= "" and vim.startswith(activated, root) then
+    found[#found + 1] = vim.fs.relpath(root, activated .. "/bin") or (activated .. "/bin")
+    seen[found[#found]] = true
+  end
+
+  for _, evidence in ipairs(M.bin_evidence) do
+    local marker = vim.fn.glob(root .. "/" .. evidence.marker, false, true)
+    if #marker > 0 and not seen[evidence.bin] then
+      seen[evidence.bin] = true
+      found[#found + 1] = evidence.bin
+    end
+  end
+
+  if vim.uv.fs_stat(root .. "/result/bin") and not seen["result/bin"] then
+    found[#found + 1] = "result/bin"
+  end
+
+  return found
+end
 
 --- Files that mean "the directory containing me is a project root".
 M.root_markers = {
@@ -75,12 +100,53 @@ end
 ---@param name string
 ---@param start? string directory to search from. Default: the current one.
 ---@return string|nil path an absolute path, or nil when the project has none
+---@param root string
+---@return boolean
+local function may_run_project_bin(root)
+  local allowed = require("util.settings").get("lsp_project_bin")
+  if allowed == true then
+    return true
+  end
+  if allowed == false then
+    return false
+  end
+  return require("util.trust").is_trusted(root)
+end
+
+---@type table<string, boolean>
+local refused = {}
+
+---@param root string
+---@param candidate string
+local function say_refused(root, candidate)
+  if refused[root] then
+    return
+  end
+  refused[root] = true
+
+  vim.schedule(function()
+    vim.notify(
+      ("%s ships its own %s.\n\nIt was not started: a program from a repository runs as you do, with your environment. :DotfilesTrustProject to allow this one, or set lsp_project_bin."):format(
+        vim.fn.fnamemodify(root, ":~"),
+        vim.fn.fnamemodify(candidate, ":t")
+      ),
+      vim.log.levels.WARN,
+      { title = "Untrusted project" }
+    )
+  end)
+end
+
 function M.project_bin(name, start)
   local root = M.root(start or vim.fn.getcwd())
+  local trusted = may_run_project_bin(root)
 
-  for _, dir in ipairs(M.bin_dirs) do
+  for _, dir in ipairs(M.bin_dirs(root)) do
     for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/" .. name, false, true)) do
       if vim.fn.executable(candidate) == 1 then
+        if not trusted then
+          say_refused(root, candidate)
+          return nil
+        end
         return candidate
       end
     end
@@ -145,7 +211,7 @@ M.status = {}
 ---@param name string
 ---@return boolean
 local function ignored(name)
-  local list = vim.g.lsp_ignore
+  local list = require("util.settings").get("lsp_ignore")
   return type(list) == "table" and vim.tbl_contains(list, name) or false
 end
 
@@ -228,17 +294,63 @@ local warned = {}
 --- without one until a feature is missing. Repeating it on every buffer would
 --- be worse.
 ---@param filetype string
+--- Filetypes that no language server serves, so saying one is missing would be
+--- noise rather than news. Buffers the editor makes for itself, and prose.
+---@type string[]
+M.unserved = {
+  "checkhealth",
+  "gitcommit",
+  "gitrebase",
+  "help",
+  "lazy",
+  "man",
+  "mason",
+  "qf",
+  "snacks_dashboard",
+  "snacks_picker_input",
+  "snacks_picker_list",
+  "text",
+  "trouble",
+  "TelescopePrompt",
+}
+
 function M.warn_missing(filetype)
   if warned[filetype] or filetype == "" then
     return
   end
   warned[filetype] = true
 
+  -- Filetypes nobody serves, where silence is the right answer.
+  if vim.tbl_contains(M.unserved, filetype) then
+    return
+  end
+
   local missing = {}
+  local configured = false
   for name, info in pairs(M.status) do
-    if info.status == "missing" and vim.tbl_contains(info.filetypes or {}, filetype) then
-      table.insert(missing, name)
+    if vim.tbl_contains(info.filetypes or {}, filetype) then
+      configured = true
+      if info.status == "missing" then
+        table.insert(missing, name)
+      end
     end
+  end
+
+  -- Nothing is configured for this language at all, which is a different
+  -- problem with a different fix. Returning early here was wrong in a way that
+  -- only shows up outside the languages this configuration enables: a Rust or
+  -- C file opened with no server, no diagnostics and no explanation, because
+  -- rust_analyzer and clangd are never configured and so were never "missing".
+  if not configured then
+    vim.notify(
+      ("No language server for %s, and none is configured for it.\n\n:LazyExtras adds language support — look for lang.%s.\nA server already on PATH is picked up without one."):format(
+        filetype,
+        filetype
+      ),
+      vim.log.levels.WARN,
+      { title = "Language servers" }
+    )
+    return
   end
 
   if #missing == 0 then
@@ -248,8 +360,10 @@ function M.warn_missing(filetype)
   table.sort(missing)
 
   vim.notify(
-    ("No language server for %s.\n\nConfigured but not provided by this project or PATH:\n  %s\n\nInstall one in the project, or on PATH, and restart.\n:checkhealth dotfiles lists them.")
-      :format(filetype, table.concat(missing, ", ")),
+    ("No language server for %s.\n\nConfigured but not provided by this project or PATH:\n  %s\n\nInstall one in the project, or on PATH, and restart.\n:checkhealth dotfiles lists them."):format(
+      filetype,
+      table.concat(missing, ", ")
+    ),
     vim.log.levels.WARN,
     { title = "Language servers" }
   )
