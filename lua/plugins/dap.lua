@@ -285,32 +285,49 @@ return {
         })
       end
 
+      local handled = vim.list_extend({ "julia" }, CODELLDB_FILETYPES)
+
+      local function register(filetype)
+        local root = project_root()
+        local ours = filetype == "julia" and julia_configurations(root) or codelldb_configurations(filetype, root)
+
+        -- Prepended rather than assigned. mason-nvim-dap registers an
+        -- "LLDB: Launch" for every adapter it installs, and that one asks for
+        -- the executable with vim.fn.input. Returning early when something was
+        -- already registered left ours unreachable; replacing would discard
+        -- what a project set in its own .nvim.lua.
+        local mine = {}
+        for _, configuration in ipairs(ours) do
+          mine[configuration.name] = true
+        end
+
+        local merged = vim.deepcopy(ours)
+        for _, configuration in ipairs(dap.configurations[filetype] or {}) do
+          if not mine[configuration.name] then
+            merged[#merged + 1] = configuration
+          end
+        end
+        dap.configurations[filetype] = merged
+      end
+
       vim.api.nvim_create_autocmd("FileType", {
         group = vim.api.nvim_create_augroup("dotfiles_dap_configurations", { clear = true }),
-        pattern = vim.list_extend({ "julia" }, CODELLDB_FILETYPES),
+        pattern = handled,
         callback = function(event)
-          local root = project_root()
-          local ours = event.match == "julia" and julia_configurations(root) or codelldb_configurations(event.match, root)
-
-          -- Prepended rather than assigned. mason-nvim-dap registers an
-          -- "LLDB: Launch" for every adapter it installs, and that one asks
-          -- for the executable with vim.fn.input. Returning early when
-          -- something was already registered left ours unreachable; replacing
-          -- would discard what a project set in its own .nvim.lua.
-          local mine = {}
-          for _, configuration in ipairs(ours) do
-            mine[configuration.name] = true
-          end
-
-          local merged = vim.deepcopy(ours)
-          for _, configuration in ipairs(dap.configurations[event.match] or {}) do
-            if not mine[configuration.name] then
-              merged[#merged + 1] = configuration
-            end
-          end
-          dap.configurations[event.match] = merged
+          register(event.match)
         end,
       })
+
+      -- This plugin loads when a debug key is first pressed, by which time
+      -- FileType has long since fired for the file being debugged. Without
+      -- this, nothing is registered for the buffer you are standing in and the
+      -- key appears to do nothing at all.
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        local filetype = vim.bo[buf].filetype
+        if vim.tbl_contains(handled, filetype) then
+          register(filetype)
+        end
+      end
     end,
   },
 }
