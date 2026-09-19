@@ -11,7 +11,7 @@
   10   │ │ out[i] = items[i]
   11   │ end
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-    ~/dotfiles/tools/nvim-harness/fixture/  2
+    PROJECT/  2
    └╴󰢱  buggy.lua  2
      ├╴  Need check nil. Lua Diagnostics. (need-check-nil) [28, 16]
      └╴  Need check nil. Lua Diagnostics. (need-check-nil) [29, 3]

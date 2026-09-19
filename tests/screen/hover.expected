@@ -5,7 +5,7 @@
    3   ---@param a number
    2   ---@param b number
    1   ---@return number
-   8   function M.add(a: number, b: number) /M.add            [1/2]
+   8   function M.add(a, b) /M.add            [1/2]
    1   │ return   function M.add(a: number, b: number)
    2   end          -> number
    3              ────────────────────────────────────
