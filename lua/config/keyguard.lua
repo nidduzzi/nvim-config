@@ -85,13 +85,42 @@ end
 --- is not counted as a second overwrite of the same key.
 local inside_helper = false
 
+--- What a key does globally, ignoring any buffer-local mapping over it.
+---
+--- `vim.fn.maparg` is buffer-aware and answers with the buffer-local mapping
+--- when one exists, which makes it the wrong witness twice. It cannot tell a
+--- shadow from a replacement, and while a shadow is in place it reports the
+--- same answer before and after a global set — so a plugin replacing a global
+--- key while you sit in a diff view looked like no change at all.
+---@param mode string
+---@param lhs string
+---@return string
+local function global_map(mode, lhs)
+  local wanted = vim.fn.keytrans(vim.api.nvim_replace_termcodes(lhs, true, true, true))
+  for _, map in ipairs(vim.api.nvim_get_keymap(mode)) do
+    if vim.fn.keytrans(vim.api.nvim_replace_termcodes(map.lhs, true, true, true)) == wanted then
+      return summarise(map)
+    end
+  end
+  return ""
+end
+
+--- Whether the global mapping for this key is still what it was.
+---@param mode string
+---@param lhs string
+---@param previous string
+---@return boolean
+local function still_global(mode, lhs, previous)
+  return global_map(mode, lhs) == previous
+end
+
 --- Record one overwrite, and speak up when it takes a watched key.
 ---@param mode string
 ---@param lhs string
 ---@param before table|nil
 ---@param buffer boolean
 local function record(mode, lhs, before, buffer)
-  local previous = summarise(before)
+  local previous = type(before) == "string" and before or summarise(before)
   if previous == "" then
     return
   end
@@ -101,10 +130,10 @@ local function record(mode, lhs, before, buffer)
   -- every time, which is what the first version of this did.
   local who, mine = caller()
 
-  -- What the key became is only knowable after the set has happened.
+  -- What the key became is only knowable after the set has happened. A global
+  -- set is judged against the global table, for the reason in global_map.
   vim.schedule(function()
-    local now = vim.fn.maparg(lhs, mode, false, true)
-    local after = summarise(now)
+    local after = buffer and summarise(vim.fn.maparg(lhs, mode, false, true)) or global_map(mode, lhs)
 
     -- Replacing a mapping with the identical one is not an overwrite.
     if after == previous or after == "" then
@@ -125,6 +154,24 @@ local function record(mode, lhs, before, buffer)
       buffer = buffer,
     }
     table.insert(M.overwrites, entry)
+
+    -- A buffer-local mapping shadows the global one inside that buffer and
+    -- leaves it intact everywhere else. That is not the loss this watches for,
+    -- and reporting it as one was wrong twice over: `maparg` answers with the
+    -- buffer-local mapping when there is one, so the "now" it read was the
+    -- shadow while the global key it claimed had been taken was still bound.
+    --
+    -- Diffview is the honest case. It binds <leader>gd, <leader>gm and
+    -- <leader>e inside its own two windows, from file.lua and panel.lua, so
+    -- opening a diff produced six warnings about three keys that all still
+    -- worked the moment you left the diff.
+    --
+    -- So a shadow is only news when the global mapping is gone as well. The
+    -- global table is asked directly, because `maparg` cannot be.
+    if entry.buffer and still_global(mode, lhs, previous) then
+      entry.shadow = true
+      return
+    end
 
     -- A key this config takes on purpose is not the fault being watched for.
     -- The watch list names the keys this config owns, so its own deliberate
@@ -150,10 +197,19 @@ function M.setup()
     local buffer = type(opts) == "table" and opts.buffer ~= nil
 
     for _, one in ipairs(modes) do
-      -- maparg answers for the current buffer, which is what the key will do.
-      local before = vim.fn.maparg(lhs, one, false, true)
-      if before and not vim.tbl_isempty(before) then
-        record(one, lhs, before, buffer)
+      -- A buffer-local set is judged by what the key does in this buffer,
+      -- which is what maparg answers. A global set is judged by the global
+      -- table, which is the only thing a global set can actually replace.
+      if buffer then
+        local before = vim.fn.maparg(lhs, one, false, true)
+        if before and not vim.tbl_isempty(before) then
+          record(one, lhs, before, true)
+        end
+      else
+        local before = global_map(one, lhs)
+        if before ~= "" then
+          record(one, lhs, before, false)
+        end
       end
     end
 
