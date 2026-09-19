@@ -128,3 +128,42 @@ map, even with `outFiles` and `resolveSourceMapLocations`. Running the
 TypeScript directly works and is simpler, so that is the documented path. A
 project that must debug built output can set `outFiles` in its own
 configuration.
+
+---
+
+## 9. Our debug configurations are prepended, not assigned
+
+**Decided:** the FileType handler puts this configuration's entries in front of
+whatever is already registered, and keeps the rest.
+
+**Against:** returning early when something was registered (the first version),
+or replacing the list outright.
+
+**On:** mason-nvim-dap registers an "LLDB: Launch" for every adapter it
+installs, and that one asks for the executable with `vim.fn.input`. Returning
+early left ours unreachable — pressing the debug key opened a prompt that
+blocks the editor until you type an absolute path. Replacing the list would
+discard configurations a project set in its own `.nvim.lua`.
+
+Found by driving the keys rather than the API: `dap.run({ type = "codelldb" })`
+worked in every test, because it bypasses the configuration list entirely.
+The thing a person actually presses did not.
+
+---
+
+## 10. The executable is derived from the build system
+
+**Decided:** `program` looks for built output using the marker that proves the
+build system is in use — `Cargo.toml` means `target/debug`, `CMakeLists.txt`
+means `build`, and so on — and falls back to executables sitting in the root
+for a project compiled by hand.
+
+**Against:** asking for the path every time, which is what both LazyVim's
+clangd extra and mason-nvim-dap do.
+
+**On:** the answer is almost always one file and the editor can see it. One
+candidate is used without asking, several offer a list, none falls back to the
+prompt.
+
+Resolved in 0.1ms against the three test projects: `hello`, `hello`, and
+`target/debug/rust-hello`.
