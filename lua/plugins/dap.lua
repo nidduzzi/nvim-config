@@ -174,12 +174,22 @@ return {
           return
         end
         callback({
-          type = "executable",
-          command = command,
-          args = {
-            "--project=" .. root,
-            "-e",
-            [[using DebugAdapter; DebugAdapter.run_debugger(stdin, stdout)]],
+          type = "server",
+          host = "127.0.0.1",
+          port = "${port}",
+          executable = {
+            command = command,
+            args = {
+              "--project=" .. root,
+              "-e",
+              table.concat({
+                "using DebugAdapter, Sockets",
+                "server = Sockets.listen(parse(Int, ARGS[1]))",
+                "conn = Sockets.accept(server)",
+                "run(DebugAdapter.DebugSession(conn))",
+              }, "; "),
+              "${port}",
+            },
           },
         })
       end

@@ -96,3 +96,35 @@ has a python that other tools may pick up.
 cannot create a venv with pip, so `:MasonInstall debugpy` fails there too.
 Either install `python3-venv` and `python3-pip`, or accept that Python
 debugging needs a project virtualenv. The configuration works either way.
+
+---
+
+## 7. Julia's debugger is a server, not a program on a pipe
+
+**Decided:** the Julia adapter is `type = "server"`. Julia opens a socket and
+nvim-dap connects to it.
+
+**Against:** `type = "executable"` over stdin and stdout, which is how the
+other adapters work and what the first version did.
+
+**On:** `DebugAdapter.run_debugger(stdin, stdout)` does not exist. The package
+exports `DebugSession(conn)` and `run(session)`, and its README says `conn`
+should be "a named pipe or socket connection" — one duplex stream, which
+Julia's separate stdin and stdout are not. The adapter started, answered
+`initialize`, and exited 1.
+
+---
+
+## 8. TypeScript needed nothing
+
+**Decided:** no configuration added for TypeScript or TSX.
+
+**On:** Node 22.22 strips types natively, so LazyVim's `Launch file`, which
+runs `${file}` with node, already stops on a breakpoint in a `.ts` file:
+`global.add at line 2 in main.ts`.
+
+Breakpoints in a `.ts` compiled to `dist/` do **not** bind through the source
+map, even with `outFiles` and `resolveSourceMapLocations`. Running the
+TypeScript directly works and is simpler, so that is the documented path. A
+project that must debug built output can set `outFiles` in its own
+configuration.
