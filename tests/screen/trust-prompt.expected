@@ -5,7 +5,7 @@
    4   ---@param a number
    5   ---@param b number
    6   ---@return number
-   7   fu╭────────────── Not trusted: PROJECT ──────────────╮
+   7   fu╭─ Not trusted: PROJECT ─╮
    8   │ │                                                                           3/TOTAL │
    9   en│────────────────────────────────────────────────────────────────────────────────│
   10     │ 1. Trust this project: run its programs and its git                            │
