@@ -1266,3 +1266,36 @@ were real defects and are fixed. The third changed nothing.
 
 So the macOS job runs the six, and the browser case is checked on Linux and by
 hand. The gap is here rather than hidden behind a green tick.
+
+---
+
+## 53. Windows: the adapters are there, and the sessions die silently
+
+**Needs your call eventually. Not blocking anything today.**
+
+Windows has no tmux, so the driven check cannot run there at all. A headless
+one now can --- `check-debuggers-headless.sh` asks nvim-dap directly, start
+this configuration and stop on this line --- and it runs on Linux, macOS and
+Windows alike. Six languages stop through it here.
+
+On the Windows runner both cases fail the same way:
+
+    python       never stopped: Run this file, session gone -- the adapter logged nothing
+    typescript   never stopped: Run this file, session gone -- the adapter logged nothing
+
+What is known: mason installs into `C:\Users\…\AppData\Local\nvim-lazyvim-data`,
+the gate finds the adapters there, the configurations are offered, the session
+starts and is gone by the time anything asks. nvim-dap's log has nothing in it
+at all, which is what a command that never ran looks like. The likely reason
+is that mason's Windows shims are `.CMD` files, and a `.CMD` is not a program
+libuv can spawn without a shell --- but that is a hypothesis, not a finding.
+
+Three things got fixed on the way to this being reportable rather than a hang:
+a Git Bash path Neovim could not open (`luafile /d/a/…` is E484, which is a
+hit-enter prompt, which is a headless editor that never exits), an answer that
+was never flushed before the quit threw it away, and a mason directory looked
+for where Windows does not keep it.
+
+The Windows job reports rather than enforces until this is understood. The
+alternative --- a red tick on every push saying the same thing --- is a tick
+nobody reads.
