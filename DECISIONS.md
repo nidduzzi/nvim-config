@@ -1098,3 +1098,32 @@ the list is cached per root. The walk both of them replaced was 218ms.
 Worth knowing rather than worth fixing: the untrusted path is the one a
 cloned repository gets, and 35ms on the first search of a project nobody has
 vouched for is not a cost anyone can feel.
+
+---
+
+## 47. The debuggers were never driven to a breakpoint
+
+**Every language stopped. One of them never had.**
+
+The tour asserted a breakpoint sign in the margin, which the editor draws
+whether or not an adapter ever answers. `check-debuggers.sh` now opens the
+file, sets the breakpoint, starts the session, picks the first configuration
+and matches on the argument values in the variables pane --- `b int = 1` ---
+which only a live adapter can put on the screen.
+
+    python      main.py:3     debugpy
+    typescript  main.ts:2     pwa-node, types stripped by node
+    c           main.c:4      codelldb
+    cpp         main.cpp:5    codelldb
+    rust        src/main.rs:2 codelldb
+    julia       main.jl:2     DebugAdapter.DebugSession
+
+Julia failed on the first run: `exepath("julia")` follows the symlink, and a
+mise shim points at mise itself, so the adapter was started as `/usr/bin/mise`
+with Julia's arguments and exited 2 before speaking. `runs()` had checked
+`--version`, which mise answers happily. The trust decision is still made on
+the resolved path; only the spelling handed to the adapter changed.
+
+Adapters are looked for in mason as well as on PATH --- looking only at PATH
+reported codelldb missing on a machine where three languages debugged fine ---
+and a run that checked nothing fails rather than passing quietly.
