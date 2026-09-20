@@ -968,3 +968,31 @@ inside an untrusted project --- was comparing two spellings of one directory.
 
 All fourteen jobs pass: lint, the debug-call check, and the specs and boot
 check on Linux, macOS and Windows against stable and nightly.
+
+---
+
+## 43. The rung ladder, re-proved against the CLI that shipped today
+
+**Decided:** nothing changes. Recorded because the guarantee is a claim about
+somebody else's program, and that program updates itself.
+
+**On:** all four rungs were run against `claude` 2.1.278 and each held:
+
+    chat      tools=[] mcp_servers=[]              canary untouched
+    context   tools=[] mcp_servers=[]              canary untouched
+    explore   tools=[Glob, Grep, Read]             canary untouched
+    edit      tools=[Edit, Glob, Grep, Read, Write] canary changed, as permitted
+
+`rung-flags-match.py` confirms the flags proved here are the flags the editor
+sends.
+
+The two findings in `agent-canary.sh`'s own header are why this is re-run
+rather than trusted: `--tools ""` once left every MCP server registered, and
+Hermes' `-t ""` was ignored as falsy and left `file` and `terminal` enabled,
+which overwrote the canary on the first attempt. Neither would have been found
+by reading the documentation, and neither stays fixed by itself.
+
+Also driven in the same pass, and correct: session save and restore through
+persistence.nvim (two buffers and the working directory came back), grug-far's
+search-and-replace window, and `<c-c>` closing it --- it is a `nofile` buffer,
+so the rule from 32 covers a plugin nobody had tested against.
