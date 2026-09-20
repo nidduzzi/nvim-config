@@ -89,6 +89,55 @@ describe("asking about a project", function()
     assert.is_truthy(asked[1].items[3]:match("every project on this machine"))
   end)
 
+  it("writes the machine-wide answer into local.lua", function()
+    local settings_file = settings.local_file()
+    local before = vim.uv.fs_stat(settings_file) and vim.fn.readfile(settings_file) or nil
+
+    vim.ui.select = function(items, _, choose)
+      choose(items[3], 3)
+    end
+    menu.open(root)
+
+    local written = table.concat(vim.fn.readfile(settings_file), "\n")
+    assert.is_truthy(written:match("git_project%s*=%s*true"))
+
+    if before then
+      vim.fn.writefile(before, settings_file)
+    else
+      vim.fn.delete(settings_file)
+    end
+    settings.reload()
+  end)
+
+  it("keeps the rest of a local.lua it did not write", function()
+    local settings_file = settings.local_file()
+    local before = vim.uv.fs_stat(settings_file) and vim.fn.readfile(settings_file) or nil
+
+    vim.fn.writefile({
+      "-- my own notes",
+      "return {",
+      '  agent_backend = "hermes",',
+      "}",
+    }, settings_file)
+
+    vim.ui.select = function(items, _, choose)
+      choose(items[3], 3)
+    end
+    menu.open(root)
+
+    local written = table.concat(vim.fn.readfile(settings_file), "\n")
+    assert.is_truthy(written:match("my own notes"))
+    assert.is_truthy(written:match('agent_backend = "hermes"'))
+    assert.is_truthy(written:match("git_project%s*=%s*true"))
+
+    if before then
+      vim.fn.writefile(before, settings_file)
+    else
+      vim.fn.delete(settings_file)
+    end
+    settings.reload()
+  end)
+
   it("offers untrusting a project that is trusted", function()
     trust.allow(root)
     menu.open(root)
