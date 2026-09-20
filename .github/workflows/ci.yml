@@ -27,11 +27,19 @@ jobs:
             exit 1
           fi
 
+  # macOS is in the matrix because this configuration is written on Linux and
+  # nothing here had ever run anywhere else. The screens are not: a terminal
+  # on another platform draws its own way, and a golden frame is a statement
+  # about one terminal. What these check is the half that is platform
+  # behaviour rather than drawing --- paths, separators, shells, the standard
+  # directories --- which is where the portability defects were found by
+  # reading.
   specs:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         neovim: [stable, nightly]
     steps:
       - uses: actions/checkout@v4
@@ -42,14 +50,15 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .tests
-          key: tests-${{ matrix.neovim }}-${{ hashFiles('lazy-lock.json', 'tests/minit.lua') }}
+          key: tests-${{ matrix.os }}-${{ matrix.neovim }}-${{ hashFiles('lazy-lock.json', 'tests/minit.lua') }}
       - run: ./scripts/test
 
   boot:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         neovim: [stable, nightly]
     steps:
       - uses: actions/checkout@v4

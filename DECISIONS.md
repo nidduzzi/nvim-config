@@ -579,3 +579,30 @@ adapter" forever.
 Also confirmed, since the test needed it: `bin_dirs` is evidence-based, so a
 `.venv` without a `pyvenv.cfg` is not a virtualenv and its `bin` is not
 searched. That is the intended answer, not a miss.
+
+---
+
+## 29. macOS is in CI; Windows is not
+
+**Decided:** the specs and the boot-and-health job run on `macos-latest` as
+well as `ubuntu-latest`, over both stable and nightly Neovim. The screens stay
+on Linux only.
+
+**Against:** a local VM, and against leaving both platforms unverified.
+
+**On:** four portability defects were found by reading (23), and nothing had
+ever run off Linux. A hosted macOS runner costs nothing and exercises the half
+that is platform behaviour — paths, separators, shells, the standard
+directories — which is exactly where those defects were.
+
+The screens are excluded deliberately. A golden frame is a statement about one
+terminal: a different platform draws its own box characters, its own widths
+and its own idea of what a Nerd Font glyph occupies. Committing a second set
+would be committing a second thing to keep in step.
+
+**Still open, and yours to decide:** Windows. `windows-latest` runs Neovim,
+but the shell is PowerShell, the harness is bash, and the fixture generator
+and every gate assume a POSIX shell. Making the gates shell-agnostic is a day
+of work on scripts, not on the configuration; saying so is cheaper than
+pretending a green tick means Windows works. The `shellcmdflag` fix in 23 is
+the one that most wants it.
