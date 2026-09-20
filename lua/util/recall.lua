@@ -82,73 +82,63 @@ function M.add(kind, value)
   end
 end
 
+--- The values the open prompt completes against. One prompt is open at a
+--- time, and the completion function is named in a string Vim resolves while
+--- it is open, so this is where the two meet.
+---@type string[]
+local offered = {}
+
+--- Completion for the open prompt, by prefix.
+---
+--- `customlist` completion does its own filtering, and prefix rather than
+--- fuzzy is what completing a path glob wants: typing `src` should not offer
+--- `.github/workflows/**` because the letters appear in order somewhere.
+---@param base string
+---@return string[]
+function M.complete(base)
+  return vim.tbl_filter(function(value)
+    return value:sub(1, #base) == base
+  end, offered)
+end
+
 --- Ask for text, offering what was typed here before.
 ---
---- With nothing remembered, and with no picker available, this is an ordinary
---- prompt — the recall is an addition, never a dependency.
----@param opts { kind: string, prompt: string, suggestions?: string[] }
+--- An ordinary prompt, not a picker: what you type is taken literally, `<Tab>`
+--- completes from what this project remembered, and `<Up>` walks the history.
+--- A picker was the first shape this took, and its query is a filter pattern
+--- rather than text — `!src/**` selected `docs/**`, because `!` inverts a
+--- snacks match. Globs, extension lists and questions all contain characters
+--- that pattern syntax claims.
+---
+--- `on_close` runs once the prompt is gone, whether it was answered or
+--- dismissed, so a caller that suspended something for the prompt's lifetime
+--- has one place to resume it.
+---@param opts { kind: string, prompt: string, suggestions?: string[], on_close?: fun() }
 ---@param on_done fun(value: string)
 function M.input(opts, on_done)
-  local function accept(value)
-    if not value or vim.trim(value) == "" then
-      return
-    end
-    M.add(opts.kind, value)
-    on_done(value)
-  end
-
-  local items = {}
+  offered = {}
   local seen = {}
   for _, source in ipairs({ M.list(opts.kind), opts.suggestions or {} }) do
     for _, value in ipairs(source) do
       if not seen[value] then
         seen[value] = true
-        table.insert(items, value)
+        table.insert(offered, value)
       end
     end
   end
 
-  if #items == 0 or not pcall(require, "snacks") then
-    vim.ui.input({ prompt = opts.prompt }, accept)
-    return
-  end
-
-  local entries = {}
-  for i, value in ipairs(items) do
-    table.insert(entries, { idx = i, text = value, value = value })
-  end
-
-  Snacks.picker.pick({
-    title = opts.prompt,
-    items = entries,
-    layout = { preset = "select" },
-    format = function(item)
-      return { { item.value, "SnacksPickerLabel" } }
-    end,
-    confirm = function(picker, item)
-      picker:close()
-      if item then
-        accept(item.value)
-      end
-    end,
-    -- Nothing matched means you are typing something new, which is the common
-    -- case the first few times. Take the query itself rather than making the
-    -- prompt a dead end.
-    actions = {
-      use_query = function(picker)
-        local query = picker:filter().pattern
-        picker:close()
-        accept(query)
-      end,
-    },
-    win = {
-      input = {
-        keys = {
-          ["<c-y>"] = { "use_query", mode = { "i", "n" }, desc = "Use exactly what I typed" },
-        },
-      },
-    },
-  })
+  vim.ui.input({
+    prompt = opts.prompt,
+    completion = "customlist,v:lua.require'util.recall'.complete",
+  }, function(value)
+    if value and vim.trim(value) ~= "" then
+      M.add(opts.kind, value)
+      on_done(value)
+    end
+    if opts.on_close then
+      opts.on_close()
+    end
+  end)
 end
 
 --- Directories whose contents are not this project's code.

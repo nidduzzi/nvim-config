@@ -106,14 +106,87 @@ function M.preset(name)
   end
 end
 
+--- Ways the same search can be run again, each one ripgrep flag.
+---
+--- In order, because the title is built from the ones that are on and a title
+--- that reorders itself between searches is a title nobody can read.
+---@type { name: string, key: string, desc: string, flag: string, label: string, on: string, off: string }[]
+M.toggles = {
+  {
+    name = "ignore_case",
+    key = "<a-c>",
+    desc = "Ignore case",
+    flag = "--ignore-case",
+    label = "any case",
+    on = "Ignoring case.",
+    off = "Case matters again (smart-case).",
+  },
+  {
+    name = "fixed_strings",
+    key = "<a-r>",
+    desc = "Match literally, not as a regular expression",
+    flag = "--fixed-strings",
+    label = "literal",
+    on = "Matching literally.",
+    off = "Matching as a regular expression again.",
+  },
+}
+
+--- What the picker is currently doing, read back from its own arguments
+--- rather than from a note kept alongside them.
+---@param picker table
+---@return string
+local function title_for(picker)
+  local parts = { picker.opts.search_preset or M.presets()[1].name }
+  local args = picker.opts.args or {}
+  for _, toggle in ipairs(M.toggles) do
+    if vim.tbl_contains(args, toggle.flag) then
+      table.insert(parts, toggle.label)
+    end
+  end
+  return "Grep (" .. table.concat(parts, ", ") .. ")"
+end
+
 --- Apply a preset to an open picker and search again.
+---
+--- A preset carries the globs only, so the flags a toggle added survive it:
+--- narrowing to a glob should not quietly start caring about case again.
 ---@param picker table
 ---@param preset table
 local function apply(picker, preset)
-  picker.opts.args = preset.args
+  local kept = {}
+  for _, toggle in ipairs(M.toggles) do
+    if vim.tbl_contains(picker.opts.args or {}, toggle.flag) then
+      table.insert(kept, toggle.flag)
+    end
+  end
+
+  picker.opts.args = vim.list_extend(vim.deepcopy(preset.args), kept)
   picker.opts.search_preset = preset.name
-  picker.title = "Grep (" .. preset.name .. ")"
+  picker.title = title_for(picker)
   picker:find({ refresh = true })
+end
+
+--- Run something that opens a prompt of its own, without the picker closing
+--- underneath it.
+---
+--- A snacks picker closes itself as soon as focus lands in a window that is
+--- not part of it. The prompts these filters open are floats, so the picker
+--- survives while one is up — but dismissing the prompt puts focus back in the
+--- editor, and the picker went with it: answering the glob prompt left you on
+--- the dashboard rather than in a filtered search. `auto_close` is the flag
+--- that governs that behaviour.
+---@param picker table
+---@param fn fun(done: fun())
+local function keep_open(picker, fn)
+  local previous = picker.opts.auto_close
+  picker.opts.auto_close = false
+  fn(function()
+    picker.opts.auto_close = previous
+    if not picker.closed then
+      picker:focus()
+    end
+  end)
 end
 
 --- Move to the next preset.
@@ -144,10 +217,13 @@ function M.choose(picker)
     table.insert(labels, ("%-12s %s"):format(preset.name, preset.desc))
   end
 
-  vim.ui.select(labels, { prompt = "Search filter" }, function(_, index)
-    if index then
-      apply(picker, presets[index])
-    end
+  keep_open(picker, function(done)
+    vim.ui.select(labels, { prompt = "Search filter" }, function(_, index)
+      if index then
+        apply(picker, presets[index])
+      end
+      done()
+    end)
   end)
 end
 
@@ -157,25 +233,28 @@ function M.by_extension(picker)
   -- Offer the extensions this project actually contains. Recalling that a
   -- repository is .ts and not .js is not work worth doing from memory.
   local recall = require("util.recall")
-  recall.input({
-    kind = "extensions",
-    prompt = "Extensions (comma separated)",
-    suggestions = recall.extensions(),
-  }, function(input)
-    if not input or input == "" then
-      return
-    end
+  keep_open(picker, function(done)
+    recall.input({
+      kind = "extensions",
+      prompt = "Extensions (comma separated)",
+      suggestions = recall.extensions(),
+      on_close = done,
+    }, function(input)
+      if not input or input == "" then
+        return
+      end
 
-    local globs = {}
-    for ext in input:gmatch("[^,%s]+") do
-      table.insert(globs, "*." .. ext:gsub("^%.", ""))
-    end
+      local globs = {}
+      for ext in input:gmatch("[^,%s]+") do
+        table.insert(globs, "*." .. ext:gsub("^%.", ""))
+      end
 
-    apply(picker, {
-      name = "ext:" .. input,
-      desc = "only " .. input,
-      args = glob_args(globs, false),
-    })
+      apply(picker, {
+        name = "ext:" .. input,
+        desc = "only " .. input,
+        args = glob_args(globs, false),
+      })
+    end)
   end)
 end
 
@@ -183,23 +262,26 @@ end
 ---@param picker table
 function M.by_glob(picker)
   local recall = require("util.recall")
-  recall.input({
-    kind = "glob",
-    prompt = "Path glob (! excludes)",
-    suggestions = recall.top_level_globs(),
-  }, function(input)
-    if not input or input == "" then
-      return
-    end
+  keep_open(picker, function(done)
+    recall.input({
+      kind = "glob",
+      prompt = "Path glob (! excludes)",
+      suggestions = recall.top_level_globs(),
+      on_close = done,
+    }, function(input)
+      if not input or input == "" then
+        return
+      end
 
-    local exclude = input:sub(1, 1) == "!"
-    local glob = exclude and input:sub(2) or input
+      local exclude = input:sub(1, 1) == "!"
+      local glob = exclude and input:sub(2) or input
 
-    apply(picker, {
-      name = (exclude and "not " or "") .. glob,
-      desc = "path glob",
-      args = glob_args({ glob }, exclude),
-    })
+      apply(picker, {
+        name = (exclude and "not " or "") .. glob,
+        desc = "path glob",
+        args = glob_args({ glob }, exclude),
+      })
+    end)
   end)
 end
 
@@ -426,34 +508,46 @@ function M.parse_pending(picker)
   end, 120)
 end
 
---- Search without regard to case, and back again.
+--- Turn one of the toggles above on, or off again.
 ---
 --- ripgrep is given --smart-case, so a lowercase query already ignores case
 --- and any capital makes it exact. That is the right default and the wrong one
 --- exactly when you typed a capital and meant a name: searching `Project` will
---- not find `project`. This forces the insensitive read without retyping.
+--- not find `project`. Likewise a query full of dots and brackets is usually a
+--- string rather than a pattern. Both are answered by running the same search
+--- again with one more flag.
 ---@param picker table
-function M.toggle_case(picker)
+---@param name string
+function M.toggle(picker, name)
+  local toggle
+  for _, candidate in ipairs(M.toggles) do
+    if candidate.name == name then
+      toggle = candidate
+      break
+    end
+  end
+  assert(toggle, "no such search toggle: " .. name)
+
   local args = vim.deepcopy(picker.opts.args or {})
-  local insensitive = false
+  local was_on = false
 
   for index, arg in ipairs(args) do
-    if arg == "--ignore-case" then
+    if arg == toggle.flag then
       table.remove(args, index)
-      insensitive = true
+      was_on = true
       break
     end
   end
 
-  if not insensitive then
-    table.insert(args, "--ignore-case")
+  if not was_on then
+    table.insert(args, toggle.flag)
   end
 
   picker.opts.args = args
-  picker.title = ("Grep (%s%s)"):format(picker.opts.search_preset or "code", insensitive and "" or ", any case")
+  picker.title = title_for(picker)
   picker:find({ refresh = true })
 
-  vim.notify(insensitive and "Case matters again (smart-case)." or "Ignoring case.", vim.log.levels.INFO, { title = "Search" })
+  vim.notify(was_on and toggle.off or toggle.on, vim.log.levels.INFO, { title = "Search" })
 end
 
 --- Options to open a grep picker with a preset already applied.

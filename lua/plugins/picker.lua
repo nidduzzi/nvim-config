@@ -13,6 +13,19 @@
 
 local search = require("util.search")
 
+-- One definition per toggle, in lua/util/search.lua: the key, the action and
+-- the ripgrep flag it adds. Written out here three times, they drifted — the
+-- tour drove <a-r> for a year against a key that was never bound.
+local toggle_keys = {}
+local toggle_actions = {}
+for _, toggle in ipairs(search.toggles) do
+  local action = "search_toggle_" .. toggle.name
+  toggle_keys[toggle.key] = { action, mode = { "i", "n" }, desc = toggle.desc }
+  toggle_actions[action] = function(picker)
+    search.toggle(picker, toggle.name)
+  end
+end
+
 return {
   {
     "folke/snacks.nvim",
@@ -74,7 +87,7 @@ return {
             },
           },
           input = {
-            keys = {
+            keys = vim.tbl_extend("error", {
               -- Not <a-d> or <a-p>: those are snacks' own inspect and
               -- toggle-preview, and taking them removed working features.
               ["<a-s>"] = { "search_cycle_filter", mode = { "i", "n" }, desc = "Cycle search scope" },
@@ -93,11 +106,10 @@ return {
               -- the whole tab somewhere else and left the explorer open — the
               -- item count changing from 21 to 12 was the only sign.
               ["<c-c>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
-              ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
-            },
+            }, toggle_keys),
           },
         },
-        actions = {
+        actions = vim.tbl_extend("error", toggle_actions, {
           search_cycle_filter = function(picker)
             search.cycle(picker)
           end,
@@ -110,10 +122,7 @@ return {
           search_by_glob = function(picker)
             search.by_glob(picker)
           end,
-          search_ignore_case = function(picker)
-            search.toggle_case(picker)
-          end,
-        },
+        }),
       },
     },
     keys = {

@@ -324,3 +324,59 @@ The ranked item is stable; the unranked tail is not. Everything without a
 declaration scores 1010, and snacks has no tiebreaker for equal scores, so two
 such rows swap between runs. The test greps for a symbol whose hits cannot
 tie rather than asserting an order the picker does not promise.
+
+---
+
+## 18. A prompt that asks for text is an input, not a picker
+
+**Decided:** `recall.input` opens `vim.ui.input`, and offers what the project
+remembered through `<Tab>` completion.
+
+**Against:** the snacks picker it opened before, with the remembered values as
+items and the query as the new value.
+
+**On:** a picker's query is a match pattern, not text. Typing `!src/**` at the
+glob prompt selected `docs/**`, because `!` inverts a snacks match: the prompt
+answered with the opposite of what was typed, and the search that followed was
+wrong in a way the title did not show. `'`, `^`, `$` and a space each claim a
+meaning too, and globs, extension lists and questions all contain them.
+
+An input takes the characters. Completion is prefix rather than fuzzy, which
+is what completing a path wants.
+
+---
+
+## 19. The filters keep the picker they filter open
+
+**Decided:** `search.keep_open` clears `auto_close` for as long as a filter's
+prompt is up, and restores it afterwards.
+
+**Against:** leaving it, and reopening the picker after the prompt.
+
+**On:** a snacks picker closes itself when focus lands in a window that is not
+part of it. The prompt is a float, so the picker survived while it was open —
+and then answering it put focus back in the editor and took the picker with
+it. Pressing `<a-G>`, typing a glob and pressing Enter landed on the dashboard.
+
+The picker is the thing being filtered. Reopening it would lose the query, the
+scroll position and the selection.
+
+---
+
+## 20. One definition per search toggle
+
+**Decided:** `search.toggles` lists the key, the ripgrep flag, the title label
+and what to say, and `lua/plugins/picker.lua` builds the keymap and the action
+from it.
+
+**Against:** a keymap entry, an action and a function per toggle.
+
+**On:** the feature tour drove `<a-r>` for "fixed-string matching, shown by R
+in the title". Nothing was ever bound to `<a-r>`, and no such toggle existed —
+the scenario captured a frame, the frame showed a working picker, and the run
+passed. The same tour drove `<a-p>` for the preset list, which is snacks' own
+toggle-preview, and a comment in `picker.lua` says as much three lines above
+the key it was meant to be.
+
+The title is now built from the flags that are on, so a toggle and a glob
+filter compose instead of overwriting each other's name.
