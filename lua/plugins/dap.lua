@@ -276,65 +276,12 @@ end
 --- useful configurations are "open a browser on the dev server" and "attach
 --- to the one already open", and both need the source map to be followed home
 --- --- webRoot is what turns a URL back into a file on disk.
---- A browser to debug in, wherever this machine keeps one.
----
---- js-debug looks for an installed Chrome and stops if it finds none, saying
---- so in a notification that a session nobody watched has already outlived.
---- Plenty of machines have no Chrome and a browser all the same: Playwright
---- downloads one per build into its own cache, and that browser speaks the
---- same protocol.
----@return string|nil
-local function browser_executable()
-  for _, name in ipairs({
-    "google-chrome",
-    "google-chrome-stable",
-    "chromium",
-    "chromium-browser",
-    "brave-browser",
-    "microsoft-edge",
-  }) do
-    local found = require("util.lsp").safe_exepath(name)
-    if found ~= "" then
-      return found
-    end
-  end
-
-  -- Newest build wins, which is how Playwright itself picks: the directories
-  -- are named chromium-<build>, and the binary inside is named for the
-  -- platform it runs on. Where that cache lives is Playwright's decision, and
-  -- it is a different directory on each platform.
-  local home = vim.uv.os_homedir() or ""
-  local cache = vim.env.PLAYWRIGHT_BROWSERS_PATH
-    or (vim.fn.has("win32") == 1 and vim.env.LOCALAPPDATA and vim.fs.joinpath(vim.env.LOCALAPPDATA, "ms-playwright"))
-    or (vim.fn.has("mac") == 1 and vim.fs.joinpath(home, "Library", "Caches", "ms-playwright"))
-    or vim.fs.joinpath(vim.env.XDG_CACHE_HOME or vim.fs.joinpath(home, ".cache"), "ms-playwright")
-
-  local builds = vim.fn.glob(vim.fs.joinpath(cache, "chromium-*"), false, true)
-  table.sort(builds, function(a, b)
-    return (tonumber(a:match("(%d+)$")) or 0) > (tonumber(b:match("(%d+)$")) or 0)
-  end)
-
-  for _, build in ipairs(builds) do
-    for _, relative in ipairs({
-      "chrome-linux64/chrome",
-      "chrome-linux/chrome",
-      "chrome-mac/Chromium.app/Contents/MacOS/Chromium",
-      "chrome-win/chrome.exe",
-    }) do
-      local candidate = vim.fs.joinpath(build, relative)
-      if vim.fn.executable(candidate) == 1 then
-        return candidate
-      end
-    end
-  end
-end
-
 ---@param root string
 ---@return table[]
 local function browser_configurations(root)
   local port = dev_server_port(root)
   local url = ("http://localhost:%d"):format(port)
-  local browser = browser_executable()
+  local browser = require("util.browser").executable()
 
   return {
     {
