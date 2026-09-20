@@ -50,6 +50,26 @@ local function runs(command)
   return false, vim.trim(output)
 end
 
+--- A program the editor can actually start, and the arguments to start it
+--- with.
+---
+--- mason installs its Windows programs as .CMD shims, and a .CMD is a script
+--- for the command interpreter rather than something libuv can spawn. The
+--- spawn fails before the adapter has said anything, so the session is gone by
+--- the time anyone asks and the log it would have written is empty.
+---@param command string
+---@param args string[]|nil
+---@return string command
+---@return string[] args
+local function spawnable(command, args)
+  args = args or {}
+  local windows_script = command:lower():match("%.cmd$") or command:lower():match("%.bat$")
+  if vim.fn.has("win32") == 1 and windows_script then
+    return "cmd.exe", vim.list_extend({ "/c", command }, args)
+  end
+  return command, args
+end
+
 ---@param root string
 ---@param name string
 ---@return string|nil path
@@ -397,10 +417,11 @@ return {
         local python = in_project(root, "python") or in_project(root, "python3")
 
         if python then
+          local program, arguments = spawnable(python, { "-m", "debugpy.adapter" })
           callback({
             type = "executable",
-            command = python,
-            args = { "-m", "debugpy.adapter" },
+            command = program,
+            args = arguments,
             options = { source_filetype = "python" },
             enrich_config = function(config, on_config)
               config.pythonPath = config.pythonPath or python
@@ -411,9 +432,11 @@ return {
         end
 
         if vim.fn.executable("debugpy-adapter") == 1 then
+          local program, arguments = spawnable(vim.fn.exepath("debugpy-adapter"))
           callback({
             type = "executable",
-            command = vim.fn.exepath("debugpy-adapter"),
+            command = program,
+            args = arguments,
             options = { source_filetype = "python" },
           })
           return
@@ -451,7 +474,10 @@ return {
           type = "server",
           host = "localhost",
           port = "${port}",
-          executable = { command = command, args = { "--port", "${port}" } },
+          executable = (function()
+            local program, arguments = spawnable(command, { "--port", "${port}" })
+            return { command = program, args = arguments }
+          end)(),
         })
       end
 
@@ -481,6 +507,19 @@ return {
             },
           },
         })
+      end
+
+      -- The JavaScript adapters come from LazyVim's extra, which names
+      -- js-debug-adapter -- a .CMD on Windows, which is a script rather than
+      -- a program. Wrapped where they are found rather than redefined, so
+      -- whatever else that extra decides about them still holds.
+      for _, name in ipairs({ "pwa-node", "pwa-chrome" }) do
+        local defined = dap.adapters[name]
+        if type(defined) == "table" and type(defined.executable) == "table" then
+          local program, arguments = spawnable(defined.executable.command, defined.executable.args)
+          defined.executable.command = program
+          defined.executable.args = arguments
+        end
       end
 
       local javascript_filetypes = { "typescript", "typescriptreact", "javascript", "javascriptreact" }
