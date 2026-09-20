@@ -75,3 +75,37 @@ describe("the project root", function()
     assert.equal(resolved(deep), resolved(lsp.root(deep)))
   end)
 end)
+
+describe("a program reached through a symlink", function()
+  local dir
+  local path_before
+
+  before_each(function()
+    dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, "p")
+    path_before = vim.env.PATH
+  end)
+
+  after_each(function()
+    vim.env.PATH = path_before
+    vim.fn.delete(dir, "rf")
+  end)
+
+  it("keeps the name PATH gave it", function()
+    local real = vim.fs.joinpath(dir, "manager")
+    local shim = vim.fs.joinpath(dir, "julia")
+    vim.fn.writefile({ "#!/bin/sh", "exit 0" }, real)
+    vim.fn.setfperm(real, "rwxr-xr-x")
+    vim.uv.fs_symlink(real, shim)
+
+    vim.env.PATH = dir .. ":" .. path_before
+
+    -- A version manager's shim is a symlink to the manager, and the manager
+    -- decides what to run from the name it was called by. Resolving the link
+    -- hands back the manager, which is a different program.
+    local elsewhere = vim.fn.tempname()
+    vim.fn.mkdir(elsewhere, "p")
+    assert.equal(shim, require("util.lsp").safe_exepath("julia", elsewhere))
+    vim.fn.delete(elsewhere, "rf")
+  end)
+end)
