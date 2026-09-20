@@ -606,3 +606,25 @@ and every gate assume a POSIX shell. Making the gates shell-agnostic is a day
 of work on scripts, not on the configuration; saying so is cheaper than
 pretending a green tick means Windows works. The `shellcmdflag` fix in 23 is
 the one that most wants it.
+
+---
+
+## 30. A panel is not a file, and buftype says so later than filetype
+
+**Decided:** the language-server warning reads `buftype` again after its
+two-second wait, and `M.unserved` keeps only the real-file types no server
+serves: gitcommit, gitrebase, text.
+
+**Against:** the list of fourteen filetypes it had, which named lazy, mason,
+trouble, the quickfix list, help, man, checkhealth and every picker panel.
+
+**On:** opening a merge conflict warned that nothing serves `DiffviewFiles`.
+The autocmd already skipped buffers with a buftype — but a plugin sets its
+filetype first and its buftype after, so at `FileType` the panel still looks
+like an ordinary file. The warning then fired from the deferred callback,
+where nobody looked again.
+
+Reading it at the moment the decision is made covers every panel, including
+the ones nobody thought to name. Verified by opening Lazy, checkhealth,
+Trouble, the quickfix list and help in one session: no warnings. A Rust file
+with no server still warns.

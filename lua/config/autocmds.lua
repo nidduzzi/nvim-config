@@ -14,9 +14,13 @@ vim.api.nvim_create_autocmd("FileType", {
       return
     end
 
-    -- Let the servers that are going to attach do so first.
+    -- Let the servers that are going to attach do so first, and read buftype
+    -- again when they have: a plugin sets its filetype before it sets
+    -- buftype, so the check above sees "" for a panel that is about to
+    -- become a nofile buffer. Opening a merge conflict warned that nothing
+    -- serves DiffviewFiles.
     vim.defer_fn(function()
-      if not vim.api.nvim_buf_is_valid(event.buf) then
+      if not vim.api.nvim_buf_is_valid(event.buf) or vim.bo[event.buf].buftype ~= "" then
         return
       end
       if #vim.lsp.get_clients({ bufnr = event.buf }) == 0 then

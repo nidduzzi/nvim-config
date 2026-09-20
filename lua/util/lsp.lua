@@ -353,23 +353,20 @@ local warned = {}
 --- be worse.
 ---@param filetype string
 --- Filetypes that no language server serves, so saying one is missing would be
---- noise rather than news. Buffers the editor makes for itself, and prose.
+--- noise rather than news.
+---
+--- Only real files are listed. A buffer the editor or a plugin made for
+--- itself is not a file: it has a buftype, and the autocmd that calls this
+--- checks for one. That covers lazy, mason, trouble, the quickfix list,
+--- help, man, checkhealth and every picker panel, which is what this list
+--- used to name one by one --- and it covers the ones nobody thought to name,
+--- which is how opening a merge conflict came to warn that nothing serves
+--- DiffviewFiles.
 ---@type string[]
 M.unserved = {
-  "checkhealth",
   "gitcommit",
   "gitrebase",
-  "help",
-  "lazy",
-  "man",
-  "mason",
-  "qf",
-  "snacks_dashboard",
-  "snacks_picker_input",
-  "snacks_picker_list",
   "text",
-  "trouble",
-  "TelescopePrompt",
 }
 
 function M.warn_missing(filetype)
