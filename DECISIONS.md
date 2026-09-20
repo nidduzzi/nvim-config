@@ -523,6 +523,32 @@ project rather than a fixture. The configuration is registered for
 `typescriptreact` and launching one will fail honestly; whether to add a
 browser-attach configuration is a decision about your projects.
 
-Julia is unverified: `julia` is not on PATH on this machine, so the adapter
-has never been started. The configuration is registered and the socket
-handshake is what DebugAdapter.jl documents.
+Julia is verified too, through mise: session started, stopped at the
+breakpoint, thread 1. See 27 for what that took.
+
+---
+
+## 27. A program that exists is not a program that runs
+
+**Decided:** before an adapter is started, the command is asked for its
+version, and a command that cannot answer is reported with what it said.
+
+**Against:** `vim.fn.executable()`, which is what everything here used.
+
+**On:** mise puts a shim on PATH. `executable("julia")` is true in any
+directory, and outside a project that names a version the shim exits with
+`mise ERROR No version is set for shim: julia`. The debugger started it, the
+adapter died before it spoke, and nvim-dap sat at "Starting adapter julia"
+forever. Nothing on the screen said why, and the session simply never existed.
+
+Now:
+
+    Julia debugger: julia is at ~/.local/share/mise/shims/julia,
+    and does not run here: mise ERROR No version is set for shim: julia
+
+The cost is one process at the moment a session starts, and every adapter here
+reports its own version.
+
+`make-debug-fixtures.sh` writes a `mise.toml` naming the version mise has, so
+the Julia fixture is a project the shim resolves in. Julia debugging is
+verified: stopped at the breakpoint, thread 1.

@@ -30,11 +30,41 @@ local function in_project(root, name)
   end
 end
 
+--- Whether a program that exists will also run.
+---
+--- A version manager's shim is on PATH and answers `executable()` whatever
+--- directory you are in, and then refuses to run outside a project that names
+--- a version: mise exits with "No version is set for shim: julia". The
+--- debugger started it, the adapter died before speaking, and the session
+--- never existed --- with nothing on the screen to say so.
+---
+--- Every adapter here is a program that reports its own version, and the cost
+--- is one process at the moment a session starts.
+---@param command string
+---@return boolean, string
+local function runs(command)
+  local output = vim.fn.system({ command, "--version" })
+  if vim.v.shell_error == 0 then
+    return true, ""
+  end
+  return false, vim.trim(output)
+end
+
 ---@param root string
 ---@param name string
----@return string|nil
+---@return string|nil path
+---@return string|nil refused
 local function anywhere(root, name)
-  return in_project(root, name) or (vim.fn.executable(name) == 1 and vim.fn.exepath(name) or nil)
+  local found = in_project(root, name) or (vim.fn.executable(name) == 1 and vim.fn.exepath(name) or nil)
+  if not found then
+    return nil, nil
+  end
+
+  local ok, why = runs(found)
+  if ok then
+    return found, nil
+  end
+  return nil, ("%s is at %s, and does not run here:\n\n%s"):format(name, found, why)
 end
 
 ---@param what string
@@ -315,9 +345,9 @@ return {
 
       dap.adapters.codelldb = function(callback)
         local root = project_root()
-        local command = anywhere(root, "codelldb")
+        local command, refused = anywhere(root, "codelldb")
         if not command then
-          vim.notify(missing("codelldb", root), vim.log.levels.ERROR, { title = "Debugger" })
+          vim.notify(refused or missing("codelldb", root), vim.log.levels.ERROR, { title = "Debugger" })
           return
         end
         callback({
@@ -330,9 +360,9 @@ return {
 
       dap.adapters.julia = function(callback)
         local root = project_root()
-        local command = anywhere(root, "julia")
+        local command, refused = anywhere(root, "julia")
         if not command then
-          vim.notify(missing("julia", root), vim.log.levels.ERROR, { title = "Julia debugger" })
+          vim.notify(refused or missing("julia", root), vim.log.levels.ERROR, { title = "Julia debugger" })
           return
         end
         callback({
