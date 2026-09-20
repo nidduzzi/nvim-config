@@ -38,20 +38,20 @@
 
 local M = {}
 
---- Buffers that are a view of something rather than a file, and whose window
---- should close rather than be navigated away from.
----@type table<string, boolean>
-M.overlay_filetypes = {
-  ["checkhealth"] = true,
-  ["help"] = true,
-  ["lazy"] = true,
-  ["man"] = true,
-  ["mason"] = true,
-  ["noice"] = true,
-  ["qf"] = true,
-  ["snacks_notif_history"] = true,
-  ["trouble"] = true,
-}
+--- Is this buffer a view of something rather than a file?
+---
+--- Asked of the buffer rather than of a list of names. This was a list --- of
+--- checkhealth, help, lazy, man, mason, noice, qf, the notification history
+--- and trouble --- and a list only covers what someone thought of: the
+--- debugger UI's six panels and a terminal in a split were all invisible to
+--- it, so the key that closes whatever is open did nothing in front of them.
+---
+--- Every one of those windows is a buffer with a buftype. A file has none.
+---@param buf integer
+---@return boolean
+local function is_overlay(buf)
+  return vim.bo[buf].buftype ~= ""
+end
 
 ---@return integer[] floating windows, most recently opened first
 local function floats()
@@ -75,14 +75,13 @@ end
 ---@return integer|nil
 function M.overlay_window()
   local here = vim.api.nvim_get_current_win()
-  if M.overlay_filetypes[vim.bo.filetype] or vim.bo.buftype == "quickfix" then
+  if is_overlay(vim.api.nvim_win_get_buf(here)) then
     return here
   end
 
   local found = {}
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    local buf = vim.api.nvim_win_get_buf(win)
-    if M.overlay_filetypes[vim.bo[buf].filetype] or vim.bo[buf].buftype == "quickfix" then
+    if is_overlay(vim.api.nvim_win_get_buf(win)) then
       found[#found + 1] = win
     end
   end
@@ -93,15 +92,39 @@ function M.overlay_window()
   return found[1]
 end
 
----@return boolean
-local function in_diffview()
+--- Views made of several windows, which close as a whole or not at all.
+---
+--- Closing one window of a debugger UI leaves the other five, and closing one
+--- window of a diff view leaves the tab, the file panel and the diff. Both
+--- ship a command that puts the editor back where it was, and that is the
+--- only thing that ends them.
+---@type { filetype: string, close: fun() }[]
+local composite_views = {
+  {
+    filetype = "^Diffview",
+    close = function()
+      vim.cmd.DiffviewClose()
+    end,
+  },
+  {
+    filetype = "^dap",
+    close = function()
+      require("dapui").close()
+    end,
+  },
+}
+
+--- How to close the composite view on screen, if one is.
+---@return fun()|nil
+local function composite_view()
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-    local buf = vim.api.nvim_win_get_buf(win)
-    if vim.bo[buf].filetype:match("^Diffview") then
-      return true
+    local filetype = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+    for _, view in ipairs(composite_views) do
+      if filetype:match(view.filetype) then
+        return view.close
+      end
     end
   end
-  return false
 end
 
 --- Close the most intrusive thing that is open, and nothing else.
@@ -144,12 +167,10 @@ function M.dismiss()
     return true
   end
 
-  -- A diff view owns its whole tab, and closing one of its windows is not
-  -- closing it: the tab stays, with the panel and the files it was showing.
-  -- Diffview has a command for this, and it is the only thing that puts the
-  -- editor back where it was.
-  if in_diffview() then
-    pcall(vim.cmd.DiffviewClose)
+  -- A view made of several windows closes as a whole.
+  local close_composite = composite_view()
+  if close_composite then
+    pcall(close_composite)
     return true
   end
 

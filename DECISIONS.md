@@ -648,3 +648,48 @@ Found by driving combinations rather than features: open a thing, open
 another thing over it, press the key, and see what is left. The same pass
 confirmed the ladder is right for a picker over Trouble — picker, then
 Trouble, then nothing, and the file underneath is never closed.
+
+---
+
+## 32. An overlay is a buffer with a buftype, and some views are several windows
+
+**Decided:** `dismiss` asks the buffer whether it is a file instead of
+matching a filetype against a list, and closes a debugger UI or a diff view
+through the command that owns it.
+
+**Against:** the list of nine filetypes it had.
+
+**On:** driving combinations rather than features. With the debugger UI open,
+`<c-c>` did nothing at all: six panels, none of them named in the list. With a
+terminal in a split, nothing. With a diff view, nothing — and that one could
+not be fixed by naming it either, because closing one of its windows leaves
+the tab, the panel and the diff.
+
+Every panel is a buffer with a buftype and a file has none, so the rule covers
+the plugins nobody has installed yet. The two composite views are named, with
+the command each ships, because "close this window" is not what ending them
+means.
+
+Driven after the change: explorer closes, terminal closes, the debugger UI
+closes in one press rather than six, the diff view closes and gives the tab
+back, and a picker over Trouble still closes in that order without touching
+the file underneath.
+
+Two specs had to change with it. They opened scratch buffers and called them
+files, which is exactly the distinction the new rule turns on.
+
+---
+
+## 33. Which root a feature asks about depends on the feature
+
+**Decided:** `recall` asks for the root of the working directory; the agent
+asks for the root of the buffer.
+
+**Against:** recall delegating to the agent, which it did.
+
+**On:** a conversation belongs to the code being discussed, so the agent is
+right to follow the buffer. A glob or a set of extensions belongs to the
+project being searched, and a search reads the directory. While the agent's
+marker list was shorter than the language servers' the two rarely disagreed;
+making them agree (32) made the delegation visible, as three specs that had
+been reading one project while standing in another.

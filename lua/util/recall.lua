@@ -27,14 +27,17 @@ local function store(kind, root)
   return vim.fs.joinpath(dir, vim.fn.sha256(root):sub(1, 16))
 end
 
---- The project this belongs to, matching how the agent decides the same thing.
+--- The project these lists belong to.
+---
+--- The directory you are in, not the file you are looking at. The agent asks
+--- the same question of the buffer, because a conversation belongs to the
+--- code being discussed; a glob or a set of extensions belongs to the project
+--- being searched, and a search reads the directory. Asking the agent gave
+--- the two of them different answers whenever the buffer was outside the
+--- directory.
 ---@return string
 local function root()
-  local ok, agent = pcall(require, "util.agent")
-  if ok then
-    return agent.root()
-  end
-  return assert(vim.uv.cwd())
+  return require("util.lsp").root(assert(vim.uv.cwd()))
 end
 
 --- Everything remembered for this kind, most recent first.

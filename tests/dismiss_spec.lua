@@ -1,17 +1,30 @@
 local dismiss = require("util.dismiss")
 
 describe("one key closes what is open", function()
-  local scratch
+  local files = {}
+
+  --- A real file, because what separates an overlay from a file is the
+  --- buffer's type: a scratch buffer with a filetype set is an overlay, which
+  --- is what this used to open and call a file.
+  ---@return string
+  local function a_file()
+    local path = vim.fn.tempname() .. ".lua"
+    vim.fn.writefile({ "return {}" }, path)
+    files[#files + 1] = path
+    return path
+  end
 
   before_each(function()
     vim.cmd("only")
-    scratch = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_win_set_buf(0, scratch)
-    vim.bo[scratch].filetype = "lua"
+    vim.cmd.edit(a_file())
   end)
 
   after_each(function()
     vim.cmd("only")
+    for _, path in ipairs(files) do
+      vim.fn.delete(path)
+    end
+    files = {}
   end)
 
   local function split_showing(filetype)
@@ -27,7 +40,7 @@ describe("one key closes what is open", function()
     local overlay = split_showing("trouble")
     vim.cmd("wincmd p")
 
-    assert.are.same("lua", vim.bo.filetype)
+    assert.are.same("", vim.bo.buftype)
     assert.are.same(overlay, dismiss.overlay_window())
   end)
 
@@ -48,7 +61,9 @@ describe("one key closes what is open", function()
   end)
 
   it("finds nothing when only files are open", function()
-    split_showing("lua")
+    vim.cmd("split")
+    vim.cmd.edit(a_file())
     assert.is_nil(dismiss.overlay_window())
   end)
 end)
+

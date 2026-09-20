@@ -42,14 +42,22 @@ describe("the project root", function()
     assert.equal(vim.fs.normalize(root), vim.fs.normalize(lsp.root(vim.fn.getcwd())))
   end)
 
-  it("is the same answer the agent uses", function()
+  it("is the same answer the agent uses for a file inside it", function()
     -- The agent kept a list of five markers against this one's sixteen, so a
-    -- Gradle project gave the two of them different roots and the agent's
-    -- conversation was cached against a directory nothing else agreed on.
+    -- Gradle project gave the two of them different roots, and an agent's
+    -- cached prompt includes the directory it was started in.
+    --
+    -- The agent asks about the buffer rather than the working directory, so
+    -- the comparison only means anything with a file open.
     for _, marker in ipairs({ "build.gradle", "composer.json", "mix.exs", "Gemfile" }) do
       local root = open({ marker })
+      local file = vim.fs.joinpath(root, "src", "deep", "thing.lua")
+      vim.fn.writefile({ "return {}" }, file)
+      vim.cmd.edit(file)
+
       assert.equal(vim.fs.normalize(lsp.root(vim.fn.getcwd())), vim.fs.normalize(agent.root()), marker)
     end
+    vim.cmd.enew()
   end)
 
   it("is the starting directory when nothing marks a root", function()
