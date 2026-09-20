@@ -965,3 +965,6 @@ macOS found the fourth of the same family, and the worst: `/var` is a symlink
 to `/private/var`, so `safe_exepath` --- which decides whether a program lies
 inside an untrusted project --- was comparing two spellings of one directory.
 `util.lsp.root` resolves now, so the comparison is made once, in one place.
+
+All fourteen jobs pass: lint, the debug-call check, and the specs and boot
+check on Linux, macOS and Windows against stable and nightly.
