@@ -1176,6 +1176,12 @@ Three things had to be true, and each one had failed silently:
     the picker took a letter   j typed into its filter, selecting nothing
     the ex command was dropped single quotes ended the Vimscript string
 
+All seven stop in CI as well --- python, typescript, tsx, c, cpp, rust,
+julia --- once the runner was given a TypeScript compiler to build the fixture
+with. Before that the TSX case skipped itself and the run went green having
+debugged no browser at all, which is the failure this harness exists to
+prevent: the fixture step fails now if the compiled file is not there.
+
 ---
 
 ## 49. The agent answers, checked in the editor rather than at the CLI
