@@ -1,6 +1,19 @@
 local settings = require("util.settings")
 local trust = require("util.trust")
 
+--- One spelling for a path, the way util.lsp.root produces it.
+---
+--- A temporary directory is handed out under a name that is not its own:
+--- macOS gives /var/folders, which is really /private/var/folders, and
+--- Windows gives C:\Users\RUNNER~1, which is really C:\Users\runneradmin.
+--- The code resolves; a spec that compares against the name it was given is
+--- comparing two spellings of one file.
+---@param path string
+---@return string
+local function canonical(path)
+  return vim.fs.normalize(vim.uv.fs_realpath(path) or path)
+end
+
 describe("trusting a project to run its own programs", function()
   local root
   local ruff
@@ -40,9 +53,7 @@ describe("trusting a project to run its own programs", function()
 
   it("runs it once the project is trusted", function()
     trust.allow(root)
-    -- Normalised: the fixture joins with slashes and a glob on Windows comes
-    -- back with backslashes, which is the same file spelled twice.
-    assert.are.same(vim.fs.normalize(ruff), vim.fs.normalize(require("util.lsp").project_bin("ruff", root)))
+    assert.are.same(canonical(ruff), canonical(require("util.lsp").project_bin("ruff", root)))
   end)
 
   it("refuses it again after the trust is revoked", function()
@@ -66,9 +77,7 @@ describe("trusting a project to run its own programs", function()
 
   it("always runs one when the setting says always", function()
     settings.set("lsp_project_bin", true)
-    -- Normalised: the fixture joins with slashes and a glob on Windows comes
-    -- back with backslashes, which is the same file spelled twice.
-    assert.are.same(vim.fs.normalize(ruff), vim.fs.normalize(require("util.lsp").project_bin("ruff", root)))
+    assert.are.same(canonical(ruff), canonical(require("util.lsp").project_bin("ruff", root)))
   end)
 end)
 
