@@ -30,6 +30,24 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
+-- Ask about a project nobody has answered for, once, when one is opened.
+--
+-- Trust decides whether the project's own programs run, which since git was
+-- gated includes the gutter signs and every diff. Without the question, the
+-- first sign of an untrusted project is a feature quietly missing.
+-- Asked directly rather than from a startup event: LazyVim loads this file on
+-- VeryLazy, so a VimEnter or User VeryLazy handler registered here is
+-- registered after the event it waits for has already fired, and never runs.
+-- Opening an untrusted repository asked nothing at all until this was found.
+vim.api.nvim_create_autocmd("DirChanged", {
+  group = vim.api.nvim_create_augroup("dotfiles_trust_prompt", { clear = true }),
+  callback = function()
+    require("util.trust_menu").ask_if_untrusted()
+  end,
+})
+
+require("util.trust_menu").ask_if_untrusted()
+
 vim.api.nvim_create_user_command("DotfilesTrustProject", function()
   local lsp = require("util.lsp")
   local trust = require("util.trust")
@@ -40,6 +58,7 @@ vim.api.nvim_create_user_command("DotfilesTrustProject", function()
   -- the answer changed. Reloading the buffer is what makes gitsigns attach
   -- without restarting the editor.
   require("util.git").forget()
+  require("util.trust_menu").forget()
   vim.cmd("silent! edit")
 
   vim.notify(
@@ -56,5 +75,6 @@ vim.api.nvim_create_user_command("DotfilesRevokeProject", function()
 
   trust.revoke(root)
   require("util.git").forget()
+  require("util.trust_menu").forget()
   vim.notify(("%s is no longer trusted."):format(vim.fn.fnamemodify(root, ":~")), vim.log.levels.INFO, { title = "Trusted project" })
 end, { desc = "Stop letting this project run the programs it ships" })

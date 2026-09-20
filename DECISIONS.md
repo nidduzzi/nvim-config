@@ -1034,3 +1034,39 @@ which.
 `<leader>ghp`, `<leader>gd` and `<leader>gs` run nothing. After
 `:DotfilesTrustProject` the same keys run it, which is what trusting a project
 means.
+
+---
+
+## 45. The git decision asks, rather than waiting to be asked
+
+**Decided:** opening a repository nobody has answered for shows the menu, and
+`<leader>gt` reaches the same menu at any time. A trusted project shows
+nothing.
+
+**Against:** the command alone, which is what 44 shipped.
+
+**On:** the first sign of an untrusted project was a feature quietly missing
+--- no gutter signs, and nothing on screen to say why or what to do. A gate
+whose refusal has to be discovered is a gate that reads as a bug.
+
+Three choices, because two of them are the ones people actually want:
+
+    Trust this project: run its programs and its git
+    Not now: ask again next time this project is opened
+    Trust every project on this machine (writes local.lua)
+
+The third writes `git_project = true` into the machine-local settings file,
+which is the answer for a laptop that only ever holds your own repositories.
+It edits one line and leaves the rest of that file alone.
+
+Two things the driving found:
+
+`VimEnter` and `User VeryLazy` both fire before `lua/config/autocmds.lua` is
+loaded, because LazyVim loads that file *on* VeryLazy. A handler registered
+there waits for an event that has already happened, and never runs: opening an
+untrusted repository asked nothing at all.
+
+A menu that appears a second and a half after startup lands on top of whatever
+you started in the meantime, and takes the keys meant for it. If anything is
+already open --- a picker from the dashboard, insert mode --- the question
+becomes a notification naming `<leader>gt` instead.

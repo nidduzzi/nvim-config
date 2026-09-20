@@ -136,6 +136,15 @@ function M.features()
       end,
     },
     {
+      name = "Trust this project, or stop trusting it",
+      desc = "Trust decides whether this project's own programs run: its language servers, formatters, debug adapters, and its git",
+      key = "<leader>gt",
+      kind = "feature",
+      run = function()
+        require("util.trust_menu").open(require("util.lsp").root(vim.fn.getcwd()))
+      end,
+    },
+    {
       name = "Diff the working tree",
       desc = "Side-by-side diff; the same key closes it",
       key = "<leader>gd",

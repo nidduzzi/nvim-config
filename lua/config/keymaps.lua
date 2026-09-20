@@ -21,6 +21,13 @@ map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 -- check rather than by noticing the feature had gone.
 map("n", "<leader>xD", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
 
+-- The trust menu, on a key rather than only a command: trust is what decides
+-- whether this project's programs run, and a decision you can only reach by
+-- remembering a command name is one nobody revisits.
+map("n", "<leader>gt", function()
+  require("util.trust_menu").open(require("util.lsp").root(vim.fn.getcwd()))
+end, { desc = "Git: trust this project" })
+
 -- The git pickers are LazyVim's, and they run git. Rebound here so an
 -- untrusted project gets the refusal rather than the repository's own
 -- programs. See util/git.lua.
