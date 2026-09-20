@@ -84,6 +84,7 @@ return {
           list = {
             keys = {
               ["<c-c>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
+              ["<Esc>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
             },
           },
           input = {
@@ -106,6 +107,11 @@ return {
               -- the whole tab somewhere else and left the explorer open — the
               -- item count changing from 21 to 12 was the only sign.
               ["<c-c>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
+              -- snacks' own <Esc> is `cancel`, which leaves nothing behind for
+              -- <leader>sR to resume: searching, pressing <Esc>, then asking
+              -- for the last search answered "No picker to resume", while
+              -- <c-c> on the same picker resumed it. One key, one meaning.
+              ["<Esc>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
             }, toggle_keys),
           },
         },

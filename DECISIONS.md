@@ -386,3 +386,36 @@ key taken from snacks that nobody wrote down.
 
 The title is now built from the flags that are on, so a toggle and a glob
 filter compose instead of overwriting each other's name.
+
+---
+
+## 21. `<Esc>` closes a picker, it does not cancel it
+
+**Decided:** `<Esc>` in the picker's input and list runs `close`, the same
+action `<c-c>` runs.
+
+**Against:** snacks' own `cancel`.
+
+**On:** searching, pressing `<Esc>`, then asking for the last search with
+`<leader>sR` answered "No picker to resume" and offered a list of sources.
+`<c-c>` on the same picker resumed it with the query intact. Two keys that
+both mean "I am done here" left the editor in two different states, and the
+one everybody presses was the one that threw the search away.
+
+---
+
+## 22. The fixture has to contain the thing being demonstrated
+
+**Decided:** `make-fixture.sh` writes `src/login.js` after the commit that
+adds it, and changes a line rather than only appending one.
+
+**Against:** leaving it, since every scenario captured a frame.
+
+**On:** the file was written twice before its commit, so the second write was
+what got committed and the working tree was clean. `git-signs` had no sign to
+show, `git-hunk` no hunk, `git-status` no change. The frames looked like a
+file, which is what a file looks like when nothing is wrong, and the tour
+called all three captured.
+
+Appending only meant an inline hunk preview had nothing to draw either: a
+deleted line is what it shows.
