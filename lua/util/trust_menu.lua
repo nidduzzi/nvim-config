@@ -76,6 +76,10 @@ function M.open(root)
   local git = require("util.git")
   local private = require("util.private")
 
+  -- The menu explains the refusal better than the notification does, so the
+  -- notification stays quiet for this project.
+  git.mark_explained(root)
+
   local trusted = trust.is_trusted(root)
   local where = vim.fn.fnamemodify(root, ":~")
 

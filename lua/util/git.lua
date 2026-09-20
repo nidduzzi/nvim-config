@@ -48,7 +48,18 @@ end
 ---@type table<string, boolean>
 local told = {}
 
+--- Note that this project's refusal has already been explained, so the
+--- message is not repeated by something else.
+---@param root? string
+function M.mark_explained(root)
+  told[require("util.lsp").root(root or vim.fn.getcwd())] = true
+end
+
 --- Say why a git feature did nothing, once.
+---
+--- Silent when the menu has already asked about this project: a warning and a
+--- question saying the same thing, on screen together, is one of them too
+--- many.
 ---@param root? string
 function M.say_refused(root)
   root = require("util.lsp").root(root or vim.fn.getcwd())

@@ -1069,6 +1069,12 @@ better moment on its own terms: the question is about this project's code, so
 opening some of it is when it means anything, and starting the editor and
 closing it again asks nothing.
 
+**One explanation, not two.** Opening a file in an untrusted project fired
+gitsigns' refusal notification *and* the menu, side by side, saying the same
+thing. The menu says it better, so it marks the project as explained and the
+notification stays quiet. The committed screen is what caught this --- both
+were in the frame.
+
 **The delay was the bug.** The first version waited 1.5 seconds so that snacks
 would own `vim.ui.select`, then guessed whether you looked busy and fell back
 to a notification. Both of those were working around the delay. By the time a
