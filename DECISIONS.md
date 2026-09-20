@@ -493,3 +493,36 @@ could say where a value came from, and health had no settings section.
 
 Verified: built in → `local.lua` → the project's `.nvim.lua` → set for this
 session, each overriding the one before.
+
+---
+
+## 26. The TypeScript debugger names a runtime this machine has
+
+**Decided:** a `Run this file` configuration is prepended for TypeScript,
+TSX, JavaScript and JSX, and it names a runtime only when one is needed.
+
+**Against:** LazyVim's own, which sets `runtimeExecutable` to `tsx`, or
+`ts-node` when `tsx` is absent.
+
+**On:** neither is installed by anything in this configuration, and neither is
+on this machine. A launch naming a runtime that does not exist fails with no
+message at all: `<leader>db`, `<leader>dc`, Enter — the debugger UI opens, the
+breakpoint is listed, and no session ever starts. That is what it did here
+until this was found by asking `dap.session()` rather than by looking at it.
+
+Node has stripped TypeScript types since 22.6, so on a current Node there is
+no separate runtime to find; `tsx` and `ts-node` are used only when Node is
+older, and only if one of them is there.
+
+Verified stopping at a breakpoint: Python, C, C++, Rust and TypeScript.
+
+**Still open, and yours to decide:** a `.tsx` file cannot be launched this
+way. Node strips types but does not understand JSX, so the useful path for a
+component is attaching to a dev server or a browser, which needs a real
+project rather than a fixture. The configuration is registered for
+`typescriptreact` and launching one will fail honestly; whether to add a
+browser-attach configuration is a decision about your projects.
+
+Julia is unverified: `julia` is not on PATH on this machine, so the adapter
+has never been started. The configuration is registered and the socket
+handshake is what DebugAdapter.jl documents.

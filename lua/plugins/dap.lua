@@ -169,6 +169,77 @@ local function codelldb_configurations(filetype, root)
   }
 end
 
+-- The first version of Node that runs TypeScript by stripping its types,
+-- which is what decides whether a .ts file needs a separate runtime at all.
+local NODE_STRIPS_TYPES = { 22, 6 }
+
+---@return boolean
+local function node_strips_types()
+  if vim.fn.executable("node") ~= 1 then
+    return false
+  end
+  local major, minor = vim.fn.system({ "node", "--version" }):match("v(%d+)%.(%d+)")
+  major, minor = tonumber(major), tonumber(minor)
+  if not major or not minor then
+    return false
+  end
+  if major ~= NODE_STRIPS_TYPES[1] then
+    return major > NODE_STRIPS_TYPES[1]
+  end
+  return minor >= NODE_STRIPS_TYPES[2]
+end
+
+--- TypeScript and TSX, launched with a runtime this machine has.
+---
+--- LazyVim's own configuration names `tsx` or `ts-node` as the runtime for
+--- anything TypeScript. Neither is installed by anything here, and a launch
+--- naming a runtime that does not exist fails without a message: the debugger
+--- UI opens, no session starts, and nothing says why. Node has stripped types
+--- since 22.6, so on a current Node there is no separate runtime to find.
+---@param root string
+---@return table[]
+local function javascript_configurations(root)
+  local configuration = {
+    type = "pwa-node",
+    request = "launch",
+    name = "Run this file",
+    program = "${file}",
+    cwd = root,
+    sourceMaps = true,
+    skipFiles = { "<node_internals>/**", "node_modules/**" },
+  }
+
+  if not node_strips_types() then
+    for _, runtime in ipairs({ "tsx", "ts-node" }) do
+      if vim.fn.executable(runtime) == 1 then
+        configuration.runtimeExecutable = runtime
+        break
+      end
+    end
+  end
+
+  return { configuration }
+end
+
+--- nvim-dap-python registers `file`, `file:args`, `attach` and `file:doctest`.
+--- Those names are the plugin's, and nvim-dap sorts nothing: the first entry
+--- in the prompt is whichever was registered first. This one is prepended so
+--- the obvious answer is the one already selected, and reads like the entries
+--- for every other language here.
+---@param root string
+local function python_configurations(root)
+  return {
+    {
+      type = "python",
+      request = "launch",
+      name = "Run this file",
+      program = "${file}",
+      cwd = root,
+      console = "integratedTerminal",
+    },
+  }
+end
+
 ---@param root string
 local function julia_configurations(root)
   return {
@@ -285,11 +356,23 @@ return {
         })
       end
 
-      local handled = vim.list_extend({ "julia" }, CODELLDB_FILETYPES)
+      local javascript_filetypes = { "typescript", "typescriptreact", "javascript", "javascriptreact" }
+      local handled = vim.list_extend({ "julia", "python" }, CODELLDB_FILETYPES)
+      vim.list_extend(handled, javascript_filetypes)
+
+      ---@type table<string, fun(root: string): table[]>
+      local builders = {
+        julia = julia_configurations,
+        python = python_configurations,
+      }
+      for _, filetype in ipairs(javascript_filetypes) do
+        builders[filetype] = javascript_configurations
+      end
 
       local function register(filetype)
         local root = project_root()
-        local ours = filetype == "julia" and julia_configurations(root) or codelldb_configurations(filetype, root)
+        local builder = builders[filetype]
+        local ours = builder and builder(root) or codelldb_configurations(filetype, root)
 
         -- Prepended rather than assigned. mason-nvim-dap registers an
         -- "LLDB: Launch" for every adapter it installs, and that one asks for
