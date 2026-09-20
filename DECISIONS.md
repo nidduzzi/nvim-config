@@ -773,3 +773,45 @@ PATH before the file was opened:
 
 stylua from Mason still formats, and codelldb still starts a debug session,
 because neither is inside the project being judged.
+
+---
+
+## 37. A repository's own git config runs commands, and that is git's model
+
+**Decided:** nothing is changed in the configuration. Written down instead,
+with the demonstration, because it is the one execution path found today that
+this editor cannot close.
+
+**Against:** refusing git features in untrusted projects, which would mean
+refusing them nearly everywhere: almost no project is in the trust store, and
+the trust store exists for running the project's *programs*, not for reading
+its history.
+
+**On:** git honours `diff.<name>.textconv` from the repository's own
+`.git/config`, and `.gitattributes` chooses which files it applies to. A
+directory carrying both runs that command whenever anything diffs a matching
+file:
+
+    [diff "evil"]
+        textconv = sh -c 'touch /tmp/PWNED; cat'
+
+Opening the file is not enough --- gitsigns did not trigger it here. A git
+feature is: `<leader>ghp`, `<leader>gd` and `<leader>gs` between them ran it.
+
+What limits this is delivery. `git clone` does not copy the remote's config,
+so a cloned repository cannot carry one; an archive, a shared directory or a
+container volume can. Git's own protections here are about ownership
+(`safe.directory`), not about what the config may do.
+
+The editor's own git calls pass no user-controlled diff drivers, but gitsigns
+and diffview issue their own, and neither takes `--no-textconv` from us.
+
+**Yours to decide:** whether to run git-backed features only in trusted
+projects, at the cost of asking for every repository you browse. My view is
+no --- the cost is daily and the vector needs a directory that arrived by
+some means other than a clone.
+
+Also verified while looking: `exrc` is safe. A `.nvim.lua` in an untrusted
+project does not run. Neovim asks, and the editor does not finish starting
+until it is answered --- the harness reports "Neovim did not become ready",
+which is the prompt waiting.
