@@ -194,3 +194,12 @@ end, { desc = "Stop the request in flight" })
 map("n", "<leader>aN", function()
   require("util.agent").reset()
 end, { desc = "Start a new conversation here" })
+
+-- The last thing this configuration does when it wires itself up.
+--
+-- LazyVim loads its own keymaps, then this file, on VeryLazy --- which is
+-- after the editor has drawn and after `v:vim_did_enter` is 1. Anything
+-- driving the editor from outside needs a signal that the keys exist, not
+-- that the editor started: keys sent in between go to a mapping that has not
+-- been made yet, which looks exactly like a feature that does nothing.
+vim.g.dotfiles_ready = true
