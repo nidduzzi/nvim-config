@@ -1159,3 +1159,27 @@ serves `pwa-node`, which stops fine, so this is the chrome side of it.
 Two ways forward, and this one is yours: install a real Chrome or Chromium on
 the machines that run the gate, or leave browser debugging checked by hand and
 keep the gate to the six adapters that need no browser.
+
+---
+
+## 49. The agent answers, checked in the editor rather than at the CLI
+
+`agent-canary.sh` proved the agent cannot write. Nothing proved it answers:
+review, explain and lookup each open a window, and a request that failed left
+that window empty --- which is what a slow answer looks like too.
+
+`check-agent.sh` drives the three flows against the configured backend and
+matches on what only an answer produces:
+
+    review     a finding carrying its line number
+    explain    a panel with a title and a body
+    lookup     the same, for a signature asked by name
+
+All three answer on Claude at the context rung. It stays out of CI because it
+spends real requests; it belongs beside the canary, run after touching
+lua/util/agent.
+
+The first version of the review check matched `Findings — <number>`, which is
+not what the window draws --- the title carries the scope, and the number is
+in the row. It failed against a review that had worked, which is the same
+mistake as a gate that passes on a frame nobody looked at.
