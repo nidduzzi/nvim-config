@@ -42,15 +42,10 @@ return {
           },
         },
 
-        -- Pyrefly exits quietly when it fails, so say so rather than leaving
-        -- the buffer with no type information and no explanation.
-        pyrefly = {
-          on_exit = function(code, _, _)
-            vim.schedule(function()
-              vim.notify("Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
-            end)
-          end,
-        },
+        -- Pyrefly exits quietly when it fails. Every server here now says so
+        -- --- see report_exit in util/lsp.lua --- so this needs nothing of
+        -- its own.
+        pyrefly = {},
 
         -- ty: Astral's Python type checker. Like the others, it starts only
         -- where the project provides it.

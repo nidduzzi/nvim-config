@@ -552,3 +552,30 @@ reports its own version.
 `make-debug-fixtures.sh` writes a `mise.toml` naming the version mise has, so
 the Julia fixture is a project the shim resolves in. Julia debugging is
 verified: stopped at the breakpoint, thread 1.
+
+---
+
+## 28. Neovim already says when a server quits
+
+**Decided:** nothing is added for it, and pyrefly's own handler is removed.
+
+**Against:** a shared `on_exit` on every server, which is what I wrote first.
+
+**On:** driving a project whose `.venv/bin/ruff` exits 3 produced two warnings
+where one was wanted:
+
+    Language server: ruff stopped on its own, exit code 3. :LspLog has what it said.
+    Client ruff quit with exit code 3 and signal 0. Check log for errors: …/lsp.log
+
+The second is Neovim's, it carries the same facts and the path to the log, and
+it fires for any client that quits. The comment on the pyrefly handler said
+that server "exits quietly"; that was true of an older Neovim, and the handler
+outlived the problem.
+
+The debugger needed its own check (27) for the opposite reason: nvim-dap says
+nothing at all when an adapter dies before speaking, and sits at "Starting
+adapter" forever.
+
+Also confirmed, since the test needed it: `bin_dirs` is evidence-based, so a
+`.venv` without a `pyvenv.cfg` is not a virtualenv and its `bin` is not
+searched. That is the intended answer, not a miss.
