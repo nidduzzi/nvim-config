@@ -6,7 +6,7 @@
 -- LazyVim owns that layer now, so what is left in lua/plugins is only what
 -- actually differs from the default.
 
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+local lazypath = vim.fs.joinpath(vim.fn.stdpath("data") --[[@as string]], "lazy", "lazy.nvim")
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
   local out = vim.fn.system({
     "git",

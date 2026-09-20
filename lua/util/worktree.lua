@@ -33,7 +33,10 @@ function M.list()
     return {}
   end
 
-  local cwd = vim.uv.cwd() or ""
+  -- Normalised, because git prints worktree paths with forward slashes while
+  -- the editor's idea of the current directory uses the platform's separator.
+  -- Comparing them raw says you are standing in none of your worktrees.
+  local cwd = vim.fs.normalize(vim.uv.cwd() or "")
   local trees = {}
   local current = nil
 
@@ -49,6 +52,7 @@ function M.list()
 
     if key == "worktree" then
       flush()
+      value = vim.fs.normalize(value)
       current = {
         path = value,
         branch = "",
@@ -120,7 +124,7 @@ function M.add(branch, opts)
   end
 
   local name = branch:gsub("[/%s]", "-")
-  local path = vim.fs.dirname(root) .. "/" .. vim.fs.basename(root) .. "-" .. name
+  local path = vim.fs.joinpath(vim.fs.dirname(root), vim.fs.basename(root) .. "-" .. name)
 
   local args = { "worktree", "add" }
   if opts.new then

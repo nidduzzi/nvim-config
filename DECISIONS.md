@@ -419,3 +419,35 @@ called all three captured.
 
 Appending only meant an inline hunk preview had nothing to draw either: a
 deleted line is what it shows.
+
+---
+
+## 23. Windows is corrected for, not tested on
+
+**Decided:** the places that could only work on a POSIX machine are fixed by
+reading, and each carries a comment saying what Windows does instead.
+
+**Against:** leaving them until someone runs this on Windows.
+
+**On:** four of them were found by looking:
+
+`shellcmdflag` was set to `-c` for any shell that was not literally `bash`.
+cmd.exe takes `/c` and PowerShell takes `-Command`, so on Windows that setting
+would have broken every `:!` command, every formatter and every language
+server started through a shell. It is now guarded by the platform and by a
+list of shells that take `-c`.
+
+`git worktree list --porcelain` prints forward slashes on every platform,
+while `vim.uv.cwd()` returns the platform's separator. Comparing them raw says
+you are standing in none of your worktrees. Both sides are normalised now.
+
+`vim.fn.systemlist("git diff ...")` was a string, which goes through `'shell'`
+and quotes differently on Windows. It is a list now; nothing there needs a
+shell.
+
+Two paths were built with `..` and a literal slash.
+
+**Still open, and yours to decide:** none of this is verified. A Windows or
+macOS runner in `harness.yml` would verify the first three; the screens would
+need a terminal that draws the same way, which is the part that makes it a
+decision rather than a task.
