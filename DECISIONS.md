@@ -471,3 +471,25 @@ Against the nine-file fixture it reported label-studio's 5626 tracked files,
 Compiling is not running: `check-syntax.sh` was happy with that file
 throughout. The probes are now in CI against the fixture, because they are the
 only gate that executes these modules rather than loading them.
+
+---
+
+## 25. The machine tier is verified in an editor, not only in a spec
+
+**Decided:** the four tiers were driven end to end — a real `local.lua`, a
+real `.nvim.lua`, a real `set()` — and `:checkhealth dotfiles` now prints what
+each setting resolved to and where from.
+
+**Against:** trusting the unit spec, which already covered the order.
+
+**On:** the spec exercises `resolve` with tables it builds itself. It cannot
+tell you that `local.lua` is looked for beside `init.lua` rather than in a
+state directory, that it is gitignored, or that a project's `.nvim.lua` is
+read at all — that one needs `exrc` and a trust decision, which is editor
+behaviour, not module behaviour.
+
+Driving it found that the module's own docstring was wrong: it said health
+could say where a value came from, and health had no settings section.
+
+Verified: built in → `local.lua` → the project's `.nvim.lua` → set for this
+session, each overriding the one before.
