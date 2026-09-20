@@ -432,9 +432,26 @@ return {
         require("dap-python").setup("debugpy-adapter")
       end)
 
+      --- Whether an interpreter can actually run the debug adapter.
+      ---
+      --- A project's virtualenv is the right interpreter to debug with and the
+      --- wrong one to start the adapter from unless debugpy was installed into
+      --- it: `python -m debugpy.adapter` exits 1, and a session that never
+      --- started is all anyone sees.
+      ---@param interpreter string
+      ---@return boolean
+      local function has_debugpy(interpreter)
+        vim.fn.system({ interpreter, "-c", "import debugpy" })
+        return vim.v.shell_error == 0
+      end
+
       dap.adapters.python = function(callback)
         local root = project_root()
         local python = in_project(root, "python") or in_project(root, "python3")
+
+        if python and not has_debugpy(python) then
+          python = nil
+        end
 
         if python then
           local program, arguments = spawnable(python, { "-m", "debugpy.adapter" })
