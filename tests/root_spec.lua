@@ -92,20 +92,26 @@ describe("a program reached through a symlink", function()
   end)
 
   it("keeps the name PATH gave it", function()
-    local real = vim.fs.joinpath(dir, "manager")
-    local shim = vim.fs.joinpath(dir, "julia")
-    vim.fn.writefile({ "#!/bin/sh", "exit 0" }, real)
+    -- A name no machine running this has installed: `julia` is on the Windows
+    -- runner's PATH already, and PATH's own copy would answer instead.
+    local windows = vim.fn.has("win32") == 1
+    local real = vim.fs.joinpath(dir, "version-manager" .. (windows and ".bat" or ""))
+    local shim = vim.fs.joinpath(dir, "harness-shimmed-tool" .. (windows and ".bat" or ""))
+    vim.fn.writefile(windows and { "@echo off", "exit /b 0" } or { "#!/bin/sh", "exit 0" }, real)
     vim.fn.setfperm(real, "rwxr-xr-x")
-    vim.uv.fs_symlink(real, shim)
+    if not vim.uv.fs_symlink(real, shim) then
+      -- Creating one needs a privilege Windows does not hand out by default.
+      MiniTest.skip("no symlinks here")
+    end
 
-    vim.env.PATH = dir .. ":" .. path_before
+    vim.env.PATH = dir .. (vim.fn.has("win32") == 1 and ";" or ":") .. path_before
 
     -- A version manager's shim is a symlink to the manager, and the manager
     -- decides what to run from the name it was called by. Resolving the link
     -- hands back the manager, which is a different program.
     local elsewhere = vim.fn.tempname()
     vim.fn.mkdir(elsewhere, "p")
-    assert.equal(shim, require("util.lsp").safe_exepath("julia", elsewhere))
+    assert.equal(shim, require("util.lsp").safe_exepath("harness-shimmed-tool", elsewhere))
     vim.fn.delete(elsewhere, "rf")
   end)
 end)
