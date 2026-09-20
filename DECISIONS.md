@@ -447,10 +447,9 @@ shell.
 
 Two paths were built with `..` and a literal slash.
 
-**Still open, and yours to decide:** none of this is verified. A Windows or
-macOS runner in `harness.yml` would verify the first three; the screens would
-need a terminal that draws the same way, which is the part that makes it a
-decision rather than a task.
+**Closed by 29 and 42.** All three run on macOS and Windows now, and the
+`shellcmdflag` guard is exercised by the boot job on both. The screens stay on
+Linux, for the reason in 29.
 
 ---
 
@@ -516,12 +515,8 @@ older, and only if one of them is there.
 
 Verified stopping at a breakpoint: Python, C, C++, Rust and TypeScript.
 
-**Still open, and yours to decide:** a `.tsx` file cannot be launched this
-way. Node strips types but does not understand JSX, so the useful path for a
-component is attaching to a dev server or a browser, which needs a real
-project rather than a fixture. The configuration is registered for
-`typescriptreact` and launching one will fail honestly; whether to add a
-browser-attach configuration is a decision about your projects.
+**Closed by 41.** A component is debugged in a browser, and both
+configurations for that are here.
 
 Julia is verified too, through mise: session started, stopped at the
 breakpoint, thread 1. See 27 for what that took.
@@ -600,12 +595,9 @@ terminal: a different platform draws its own box characters, its own widths
 and its own idea of what a Nerd Font glyph occupies. Committing a second set
 would be committing a second thing to keep in step.
 
-**Still open, and yours to decide:** Windows. `windows-latest` runs Neovim,
-but the shell is PowerShell, the harness is bash, and the fixture generator
-and every gate assume a POSIX shell. Making the gates shell-agnostic is a day
-of work on scripts, not on the configuration; saying so is cheaper than
-pretending a green tick means Windows works. The `shellcmdflag` fix in 23 is
-the one that most wants it.
+**Superseded by 42.** Windows runs the specs and the boot check after all:
+the runners carry Git Bash, so the scripts run unchanged and nothing had to be
+rewritten in PowerShell. The screens are still Linux only.
 
 ---
 
@@ -936,3 +928,40 @@ below the one that called it, which Lua only notices when the call runs:
 `check-syntax.sh` passed, and the editor reported `Failed to run 'config' for
 nvim-dap`. The configurations silently fell back to LazyVim's two. Driving it
 is what found that; compiling it never would have.
+
+---
+
+## 42. Windows runs the specs, through Git Bash
+
+**Decided:** `specs` and `boot` run on `windows-latest` as well, every step
+under `shell: bash`.
+
+**Against:** 29's conclusion, which was that Windows meant rewriting the
+harness in PowerShell and was therefore a day of work.
+
+**On:** that was wrong, and cheaply so: the Windows runners ship Git Bash, so
+`./scripts/test` runs as written. The only change the workflow needed was the
+boot job putting the configuration where Neovim looks for it --- a symlink
+needs developer mode on Windows, so it falls back to a copy, and the XDG
+directories moved to `runner.temp` because a directory cannot be copied into
+itself.
+
+The screens are still Linux only, for 29's reason.
+
+It found four things in the first run and three in the second, and only one of
+the seven was Windows-specific in a way that could be dismissed as
+platform noise:
+
+- a virtualenv there is `Scripts\ruff.exe`, which `util.lsp` knew and the spec
+  did not
+- NTFS has no mode bits, so the 0600 work in 39 cannot be enforced there
+- switching worktrees reopened a picker without checking one exists, which was
+  latent everywhere and surfaced there as a scheduled callback failing after
+  its test had passed
+- the worktree list marked nothing as current, because git says
+  `C:/Users/runneradmin/...` and the editor says `C:\Users\RUNNER~1\...`
+
+macOS found the fourth of the same family, and the worst: `/var` is a symlink
+to `/private/var`, so `safe_exepath` --- which decides whether a program lies
+inside an untrusted project --- was comparing two spellings of one directory.
+`util.lsp.root` resolves now, so the comparison is made once, in one place.
