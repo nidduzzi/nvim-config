@@ -371,12 +371,18 @@ from it.
 
 **Against:** a keymap entry, an action and a function per toggle.
 
-**On:** the feature tour drove `<a-r>` for "fixed-string matching, shown by R
-in the title". Nothing was ever bound to `<a-r>`, and no such toggle existed —
-the scenario captured a frame, the frame showed a working picker, and the run
-passed. The same tour drove `<a-p>` for the preset list, which is snacks' own
-toggle-preview, and a comment in `picker.lua` says as much three lines above
-the key it was meant to be.
+**On:** the feature tour drove `<a-p>` for the preset list. `<a-p>` is snacks'
+toggle-preview, and a comment in `picker.lua` says exactly that, three lines
+above the key it was meant to be. The scenario captured a frame, the frame
+showed a working picker, and the run passed for as long as the scenario has
+existed.
+
+Looking for the same mistake elsewhere produced one of my own: `<a-r>` is
+snacks' regex toggle, I read our own `lua/` for it, found nothing, and added a
+`--fixed-strings` toggle on the same key — replacing a working feature with a
+second name for it. `check-picker-keys.sh` now resolves the picker's real key
+table and fails on both: a key the tour presses that nothing answers to, and a
+key taken from snacks that nobody wrote down.
 
 The title is now built from the flags that are on, so a toggle and a glob
 filter compose instead of overwriting each other's name.
