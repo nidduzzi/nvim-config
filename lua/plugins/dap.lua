@@ -70,12 +70,32 @@ local function spawnable(command, args)
   return command, args
 end
 
+--- What mason installed, whether or not mason has loaded.
+---
+--- mason puts its own bin directory on PATH when it loads, and it loads when
+--- something asks for it. A debug session started before that -- or in a
+--- headless editor that never asks -- looks for an adapter that is installed
+--- and finds nothing.
+---@param name string
+---@return string|nil
+local function from_mason(name)
+  local bin = vim.fs.joinpath(vim.fn.stdpath("data") --[[@as string]], "mason", "bin")
+  for _, candidate in ipairs(vim.fn.glob(vim.fs.joinpath(bin, name .. "*"), false, true)) do
+    if vim.fn.executable(candidate) == 1 then
+      return candidate
+    end
+  end
+end
+
 ---@param root string
 ---@param name string
 ---@return string|nil path
 ---@return string|nil refused
 local function anywhere(root, name)
   local from_path = require("util.lsp").safe_exepath(name, root)
+  if from_path == "" then
+    from_path = from_mason(name) or ""
+  end
   local found = in_project(root, name) or (from_path ~= "" and from_path or nil)
   if not found then
     return nil, nil
@@ -431,8 +451,9 @@ return {
           return
         end
 
-        if vim.fn.executable("debugpy-adapter") == 1 then
-          local program, arguments = spawnable(vim.fn.exepath("debugpy-adapter"))
+        local adapter = vim.fn.executable("debugpy-adapter") == 1 and vim.fn.exepath("debugpy-adapter") or from_mason("debugpy-adapter")
+        if adapter then
+          local program, arguments = spawnable(adapter)
           callback({
             type = "executable",
             command = program,
@@ -516,7 +537,11 @@ return {
       for _, name in ipairs({ "pwa-node", "pwa-chrome" }) do
         local defined = dap.adapters[name]
         if type(defined) == "table" and type(defined.executable) == "table" then
-          local program, arguments = spawnable(defined.executable.command, defined.executable.args)
+          local found = defined.executable.command
+          if vim.fn.executable(found) ~= 1 then
+            found = from_mason(found) or found
+          end
+          local program, arguments = spawnable(found, defined.executable.args)
           defined.executable.command = program
           defined.executable.args = arguments
         end
