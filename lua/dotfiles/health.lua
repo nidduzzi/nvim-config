@@ -1,9 +1,13 @@
---- `:checkhealth dotfiles` — which language servers this checkout provides.
+--- `:checkhealth dotfiles` — which language servers this checkout provides,
+--- and what every setting resolved to.
 ---
 --- Nothing is installed automatically, so the interesting question is not
 --- "what is configured" but "what can actually start here, and from where".
+--- The same question applies to the settings: four tiers means a value can
+--- come from a file you last edited on a different machine.
 
 local lsp = require("util.lsp")
+local settings = require("util.settings")
 
 local M = {}
 
@@ -77,6 +81,20 @@ function M.check()
     end
   end
 
+  vim.health.start("dotfiles: settings")
+
+  local local_file = settings.local_file()
+  if vim.uv.fs_stat(local_file) then
+    vim.health.ok(vim.fn.fnamemodify(local_file, ":~") .. " is read for this machine")
+  else
+    vim.health.info(vim.fn.fnamemodify(local_file, ":~") .. " does not exist, so nothing is set for this machine alone")
+  end
+
+  for _, name in ipairs(settings.names) do
+    local value, source = settings.resolve(name)
+    vim.health.info(("%-22s %-28s %s"):format(name, vim.inspect(value):gsub("%s+", " "), source))
+  end
+
   vim.health.start("dotfiles: installing servers")
   vim.health.info(table.concat({
     "Servers are never installed automatically, and how you install one is not",
@@ -84,7 +102,12 @@ function M.check()
     "where only this project will use it, or anywhere on PATH.",
     "",
     "Project directories that are searched first:",
-    "  " .. table.concat(lsp.bin_dirs(lsp.root(vim.fn.getcwd())), "  "),
+    -- bin_dirs returns the ones that exist, so in a project with none this
+    -- line was a heading followed by nothing, which reads as a bug.
+    "  " .. (next(lsp.bin_dirs(lsp.root(vim.fn.getcwd()))) and table.concat(
+      lsp.bin_dirs(lsp.root(vim.fn.getcwd())),
+      "  "
+    ) or "none in this project"),
   }, "\n"))
 end
 
