@@ -111,7 +111,13 @@ describe("a program reached through a symlink", function()
     -- hands back the manager, which is a different program.
     local elsewhere = vim.fn.tempname()
     vim.fn.mkdir(elsewhere, "p")
-    assert.equal(shim, require("util.lsp").safe_exepath("harness-shimmed-tool", elsewhere))
+    -- Windows answers with its own separator and its own idea of the
+    -- extension's case: harness-shimmed-tool.BAT is the same file.
+    local function spelling(path)
+      return vim.fs.normalize(path):lower()
+    end
+
+    assert.equal(spelling(shim), spelling(require("util.lsp").safe_exepath("harness-shimmed-tool", elsewhere)))
     vim.fn.delete(elsewhere, "rf")
   end)
 end)
