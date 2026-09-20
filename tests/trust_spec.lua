@@ -40,7 +40,9 @@ describe("trusting a project to run its own programs", function()
 
   it("runs it once the project is trusted", function()
     trust.allow(root)
-    assert.are.same(ruff, require("util.lsp").project_bin("ruff", root))
+    -- Normalised: the fixture joins with slashes and a glob on Windows comes
+    -- back with backslashes, which is the same file spelled twice.
+    assert.are.same(vim.fs.normalize(ruff), vim.fs.normalize(require("util.lsp").project_bin("ruff", root)))
   end)
 
   it("refuses it again after the trust is revoked", function()
@@ -64,7 +66,9 @@ describe("trusting a project to run its own programs", function()
 
   it("always runs one when the setting says always", function()
     settings.set("lsp_project_bin", true)
-    assert.are.same(ruff, require("util.lsp").project_bin("ruff", root))
+    -- Normalised: the fixture joins with slashes and a glob on Windows comes
+    -- back with backslashes, which is the same file spelled twice.
+    assert.are.same(vim.fs.normalize(ruff), vim.fs.normalize(require("util.lsp").project_bin("ruff", root)))
   end)
 end)
 

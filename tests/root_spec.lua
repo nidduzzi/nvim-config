@@ -1,6 +1,15 @@
 local lsp = require("util.lsp")
 local agent = require("util.agent")
 
+--- Resolved, because macOS hands out /var/folders paths for temporary
+--- directories and /var is a symlink to /private/var: the spec would be
+--- comparing two spellings of one directory.
+---@param path string
+---@return string
+local function resolved(path)
+  return vim.fs.normalize(vim.uv.fs_realpath(path) or path)
+end
+
 ---@param markers string[]
 ---@return string
 local function project(markers)
@@ -39,7 +48,7 @@ describe("the project root", function()
 
   it("is the directory holding the marker, from anywhere below it", function()
     local root = open({ "pyproject.toml" })
-    assert.equal(vim.fs.normalize(root), vim.fs.normalize(lsp.root(vim.fn.getcwd())))
+    assert.equal(resolved(root), resolved(lsp.root(vim.fn.getcwd())))
   end)
 
   it("is the same answer the agent uses for a file inside it", function()
@@ -55,7 +64,7 @@ describe("the project root", function()
       vim.fn.writefile({ "return {}" }, file)
       vim.cmd.edit(file)
 
-      assert.equal(vim.fs.normalize(lsp.root(vim.fn.getcwd())), vim.fs.normalize(agent.root()), marker)
+      assert.equal(resolved(lsp.root(vim.fn.getcwd())), resolved(agent.root()), marker)
     end
     vim.cmd.enew()
   end)
@@ -63,6 +72,6 @@ describe("the project root", function()
   it("is the starting directory when nothing marks a root", function()
     local root = open({})
     local deep = vim.fs.joinpath(root, "src", "deep")
-    assert.equal(vim.fs.normalize(deep), vim.fs.normalize(lsp.root(deep)))
+    assert.equal(resolved(deep), resolved(lsp.root(deep)))
   end)
 end)

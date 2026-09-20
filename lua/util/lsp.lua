@@ -147,11 +147,19 @@ M.root_markers = {
 }
 
 --- The project root for a starting directory.
+---
+--- Resolved, because the same directory has more than one name. On macOS
+--- /var is a symlink to /private/var, so a root found from the working
+--- directory and a root found from a buffer's path can be the same place
+--- spelled two ways --- and every decision made by comparing them, from
+--- whether a project is trusted to whether a program lies inside it, is then
+--- made on the spelling.
 ---@param start string
 ---@return string
 function M.root(start)
   local found = vim.fs.find(M.root_markers, { path = start, upward = true })[1]
-  return found and vim.fs.dirname(found) or start
+  local root = found and vim.fs.dirname(found) or start
+  return vim.uv.fs_realpath(root) or root
 end
 
 --- Look for an executable inside the project, before falling back to PATH.
@@ -227,6 +235,9 @@ function M.safe_exepath(name, start)
   if found == "" then
     return ""
   end
+  -- Resolved for the same reason the root is: a symlinked program inside the
+  -- project is inside the project, whatever its path says.
+  found = vim.uv.fs_realpath(found) or found
 
   local root = M.root(start or vim.fn.getcwd())
   local inside = vim.fs.relpath(root, found)

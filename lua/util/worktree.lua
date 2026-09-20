@@ -15,6 +15,14 @@ local M = {}
 --- Run a git command in the current repository.
 ---@param args string[]
 ---@return string[] lines, boolean ok
+--- One spelling for a directory: symlinks resolved, short names expanded,
+--- separators forward.
+---@param path string
+---@return string
+local function canonical(path)
+  return vim.fs.normalize(vim.uv.fs_realpath(path) or path)
+end
+
 local function git(args)
   local result = vim.system(vim.list_extend({ "git" }, args), { text = true }):wait()
   local lines = vim.split(result.stdout or "", "\n", { trimempty = true })
@@ -33,10 +41,12 @@ function M.list()
     return {}
   end
 
-  -- Normalised, because git prints worktree paths with forward slashes while
-  -- the editor's idea of the current directory uses the platform's separator.
-  -- Comparing them raw says you are standing in none of your worktrees.
-  local cwd = vim.fs.normalize(vim.uv.cwd() or "")
+  -- Resolved and normalised, because the same directory is spelled several
+  -- ways. git prints forward slashes on every platform; the editor's cwd uses
+  -- the platform's separator; and Windows hands out short names, so the same
+  -- worktree is C:/Users/runneradmin/... to git and C:\Users\RUNNER~1\... to
+  -- the editor. Comparing them raw says you are standing in none of them.
+  local cwd = canonical(vim.uv.cwd() or "")
   local trees = {}
   local current = nil
 
@@ -52,7 +62,7 @@ function M.list()
 
     if key == "worktree" then
       flush()
-      value = vim.fs.normalize(value)
+      value = canonical(value)
       current = {
         path = value,
         branch = "",
