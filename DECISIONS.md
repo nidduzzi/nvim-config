@@ -717,3 +717,30 @@ through exactly that. Creation time separates them.
 
 You will be asked once more for projects trusted before this, which is the
 price of the store being checkable at all.
+
+---
+
+## 35. A formatter from a project is a program from a project
+
+**Decided:** every formatter named here resolves through
+`util.lsp.project_bin`, the same trust gate the language servers use.
+
+**Against:** conform's default, which looks in `node_modules/.bin` first.
+
+**On:** that default is right for a repository you wrote and an execution
+path for one you cloned. Demonstrated rather than argued: a repository with
+`node_modules/.bin/prettierd` as a shell script, a `package.json`, and an
+`app.js`. Opening the file and formatting it ran the script. Nothing was
+asked, nothing was said, and format-on-save means saving is enough.
+
+    formatters: prettierd@<the cloned repository>/node_modules/.bin/prettierd
+    ran: true
+
+Afterwards, in the same repository: no formatters offered, nothing executed.
+Trusting it with `:DotfilesTrustProject` brings its prettierd back. A
+formatter on PATH is unaffected --- stylua still formats a file in an
+untrusted project, because it is not the project's program.
+
+This is the third program-from-a-project path: language servers (guarded
+already), debug adapters (guarded already), and formatters. `<leader>cf` and
+format-on-save were the only one of the three that ran without asking.
