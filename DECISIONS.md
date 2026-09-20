@@ -1183,3 +1183,19 @@ The first version of the review check matched `Findings — <number>`, which is
 not what the window draws --- the title carries the scope, and the number is
 in the row. It failed against a review that had worked, which is the same
 mistake as a gate that passes on a frame nobody looked at.
+
+---
+
+## 50. Startup does not depend on how big the project is
+
+    fixture (9 files)          66.0ms  68.1ms  59.1ms
+    label-studio (60000 files) 66.9ms  75.0ms
+
+`nvim --startuptime`, headless, five runs. Nothing in this configuration walks
+the project at startup: the file list is built when a picker first asks for it
+and cached per root, the language servers attach on a buffer, and the git gate
+is a question about one directory. A large repository costs on the first
+search, which entry 46 measured, and nothing before that.
+
+Five of fifty plugins load before the dashboard is drawn, which is what
+`check-startup-plugins.sh` holds still.
