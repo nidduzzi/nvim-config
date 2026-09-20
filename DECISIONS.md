@@ -1156,9 +1156,25 @@ Playwright downloaded. `attach` against that browser, started with
 `Starting adapter pwa-chrome` and never connected; the same `js-debug-adapter`
 serves `pwa-node`, which stops fine, so this is the chrome side of it.
 
-Two ways forward, and this one is yours: install a real Chrome or Chromium on
-the machines that run the gate, or leave browser debugging checked by hand and
-keep the gate to the six adapters that need no browser.
+**Settled, and no longer yours to decide.** Both halves are fixed:
+
+    browser        the configuration finds one, Playwright's included
+    breakpoint     bound, and hit, at index.tsx:9 through the source map
+
+js-debug looks for an installed Chrome and stops when it finds none. This
+machine has no Chrome and a browser all the same --- Playwright downloads one
+per build into its own cache --- so `browser_executable()` looks along PATH
+first and falls back to the newest Playwright build, on each platform's own
+cache directory. The gate drives the browser configuration for real: it serves
+the fixture on the port the project's own dev script names, opens the page,
+and stops inside `add()` on the line the .tsx file has, not the line the
+compiled .js has.
+
+Three things had to be true, and each one had failed silently:
+
+    the page ran too early     document.body was null; the script needs defer
+    the picker took a letter   j typed into its filter, selecting nothing
+    the ex command was dropped single quotes ended the Vimscript string
 
 ---
 
