@@ -1082,3 +1082,19 @@ file has been read snacks is already loaded, so the question can arrive with
 the file --- before there is anything to interrupt. Driven frame by frame: the
 picker closes, the file appears with the menu over it, `<Esc>` dismisses it,
 and what you type next lands in the file.
+
+---
+
+## 46. What the git gate costs a large project
+
+**Measured, on label-studio: 5626 tracked files, 60000 on disk.**
+
+    trusted    5.7ms   15 extensions   (git ls-files)
+    untrusted  34.9ms  15 extensions   (ripgrep)
+
+Six times slower and the same answer, once per project per session, because
+the list is cached per root. The walk both of them replaced was 218ms.
+
+Worth knowing rather than worth fixing: the untrusted path is the one a
+cloned repository gets, and 35ms on the first search of a project nobody has
+vouched for is not a cost anyone can feel.
