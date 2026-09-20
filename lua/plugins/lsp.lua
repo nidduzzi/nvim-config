@@ -80,6 +80,14 @@ return {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
+      -- Mason installs a Python package by making a virtualenv with the
+      -- python3 it finds on PATH. A distribution python3 often cannot make
+      -- one --- ensurepip is a separate package on Debian and its
+      -- descendants --- and :MasonInstall debugpy fails with "spawn: python3
+      -- failed with exit code 1", which says nothing about what is missing.
+      -- If this machine has an interpreter that can, it goes first.
+      require("util.python").prefer_usable()
+
       opts.ensure_installed = { "lua-language-server", "stylua" }
       return opts
     end,

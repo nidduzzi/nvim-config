@@ -870,3 +870,34 @@ Neovim's `writefile` takes no mode, so these are written and then narrowed.
 The gap between the two is a race nobody can win from another account without
 already watching the directory, and closing it properly would mean writing
 through `vim.uv` by hand for a state file holding a question.
+
+---
+
+## 40. Mason gets a Python that can make a virtualenv
+
+**Decided:** when the `python3` on PATH cannot create a virtualenv, one that
+can is put in front of it, taken from whatever version manager this machine
+already has: mise, uv, pyenv or asdf.
+
+**Against:** leaving `:MasonInstall debugpy` broken and documenting the
+project-venv workaround, which is what entries 6 and 11 said to do.
+
+**On:** Mason installs a Python package by making a virtualenv with the
+`python3` it finds. Debian and its descendants ship `ensurepip` separately, so
+that python3 cannot, and the failure is `spawn: python3 failed with exit code
+1` --- which does not mention ensurepip, virtualenvs or the package that is
+missing.
+
+This machine had a working interpreter the whole time: mise's 3.13.15, twelve
+candidates in all. `:MasonInstall debugpy` now succeeds and `debugpy-adapter`
+is on PATH, and a Python file in a project with no virtualenv stops at a
+breakpoint --- which is what entry 11 said could not be done here.
+
+The interpreter is asked whether it can, rather than judged by its version:
+what is missing is a package the distribution split out, not a feature of the
+language.
+
+This is a side effect on PATH, and the only one in this configuration. It
+changes what `python3` means for every process the editor starts, which is the
+point --- Mason is not the only thing that wants a virtualenv --- and it
+happens only when the one on PATH cannot do the job.
