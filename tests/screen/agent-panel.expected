@@ -1,0 +1,24 @@
+                      ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗   ███╗          Z
+                      ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████╗ ████║      Z
+                      ██║     ███████║  ███╔╝  ╚████╔╝ ██║   ██║██║██╔████╔██║   z
+                      ██║     ██╔══██║ ███╔╝    ╚██╔╝  ╚██╗ ██╔╝██║██║╚██╔╝██║ z
+                      ███████╗██║  ██║███████╗   ██║    ╚████╔╝ ██║██║ ╚═╝ ██║
+                      ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝     ╚═╝
+
+
+
+                       Find File                                      <leader>ff
+                       ╭ What this function does ───────────────────────────────────╮
+                       │It adds two numbers.                                        │
+                       │                                                            │
+                       │The second paragraph is here to show wrapping, which the    │
+                       │panel does by hand so it can size itself before it knows    │
+                       │how its contents fold.                                      │
+                       ╰─────────────────────────── claude · context  ·  a-q closes ╯
+                       Config                                         <leader>fc
+
+                       Restore Session                                <leader>qs
+
+                       What can this editor do                         <leader>?
+
+
