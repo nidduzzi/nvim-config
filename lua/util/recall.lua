@@ -143,9 +143,10 @@ end
 
 --- Directories whose contents are not this project's code.
 ---
---- Walking them is slow and the answers are wrong: the extensions inside
---- node_modules describe somebody else's project, and offering them as filters
---- for this one is worse than offering nothing.
+--- Only the last-resort walk uses this. git and ripgrep both read the
+--- project's own ignore files, which is the same question answered by the
+--- project rather than by a list written here; this is what is left when
+--- neither is installed.
 ---@type table<string, boolean>
 local vendored = {
   [".git"] = true,
@@ -181,11 +182,46 @@ end
 --- time the extension filter is opened. Once per project is plenty — the set
 --- of languages in a repository does not change while you are looking at it.
 ---@type table<string, string[]>
-local extension_cache = {}
+local file_cache = {}
 
 --- Forget the cached walks, for when a project really has changed shape.
 function M.rescan()
-  extension_cache = {}
+  file_cache = {}
+end
+
+--- The files this project contains, as paths relative to its root.
+---
+--- git first and ripgrep second, because both read the project's own ignore
+--- files: what counts as "not this project's code" is a question the project
+--- already answers, and both are one process rather than a walk. Walking
+--- label-studio took 218ms of blocking time; on a slower filesystem, seconds.
+---@return string[]
+local function project_files()
+  local where = root()
+  if file_cache[where] then
+    return file_cache[where]
+  end
+
+  local found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
+
+  if vim.v.shell_error ~= 0 and vim.fn.executable("rg") == 1 then
+    found = vim.fn.systemlist({ "rg", "--files", "--color=never", where })
+    for index, path in ipairs(found) do
+      found[index] = vim.fs.relpath(where, path) or path
+    end
+  end
+
+  if vim.v.shell_error ~= 0 then
+    found = vim.fs.find(function(name, path)
+      return not is_vendored(path)
+    end, { path = where, type = "file", limit = 4000 })
+    for index, path in ipairs(found) do
+      found[index] = vim.fs.relpath(where, path) or path
+    end
+  end
+
+  file_cache[where] = found
+  return found
 end
 
 --- The file extensions this project actually contains, most common first, so
@@ -193,26 +229,8 @@ end
 ---@param limit? integer
 ---@return string[]
 function M.extensions(limit)
-  local where = root()
-  if extension_cache[where] then
-    return vim.list_slice(extension_cache[where], 1, limit or 15)
-  end
-
   local counts = {}
-
-  -- git already knows what the project contains, and asking it is one process
-  -- rather than a walk of the working tree. Walking label-studio took 218ms of
-  -- blocking time; on a filesystem slower than this one it is seconds.
-  local found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
-  if vim.v.shell_error ~= 0 then
-    found = vim.fs.find(function(name, path)
-      return name:match("%.[%w]+$") ~= nil and not is_vendored(path)
-    end, { path = where, type = "file", limit = 4000 })
-  else
-    found = vim.tbl_filter(function(file)
-      return not is_vendored(file)
-    end, found)
-  end
+  local found = project_files()
 
   for _, file in ipairs(found) do
     local ext = file:match("%.([%w]+)$")
@@ -229,18 +247,24 @@ function M.extensions(limit)
     return a < b
   end)
 
-  extension_cache[where] = exts
   return vim.list_slice(exts, 1, limit or 15)
 end
 
 --- The top-level directories of this project, as globs, so the path filter has
 --- somewhere to start.
+---
+--- Taken from the files the project actually has rather than from a directory
+--- listing: a directory holding nothing the search would look at is not
+--- somewhere to start, and one the project ignores is not offered at all.
 ---@return string[]
 function M.top_level_globs()
+  local seen = {}
   local out = {}
-  for name, kind in vim.fs.dir(root()) do
-    if kind == "directory" and not name:match("^%.") and not vendored[name] then
-      table.insert(out, name .. "/**")
+  for _, file in ipairs(project_files()) do
+    local top = file:match("^([^/]+)/")
+    if top and not seen[top] then
+      seen[top] = true
+      table.insert(out, top .. "/**")
     end
   end
   table.sort(out)
