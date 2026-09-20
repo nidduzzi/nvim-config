@@ -693,3 +693,27 @@ project being searched, and a search reads the directory. While the agent's
 marker list was shorter than the language servers' the two rarely disagreed;
 making them agree (32) made the delegation visible, as three specs that had
 been reading one project while standing in another.
+
+---
+
+## 34. Trust is recorded against the directory, not against its name
+
+**Decided:** the trust store keeps `path<TAB>dev:inode:birthtime`, and trust
+holds only while all three still match. Lines from the old store, which held
+paths alone, are dropped rather than honoured.
+
+**Against:** the path on its own, which is what it held.
+
+**On:** trusting a project here means running programs out of it — a language
+server or a debug adapter from `.venv/bin`. A path is not a directory: delete
+`/tmp/work` and let something else create it, and a store keyed on the name
+hands the new one everything the old one was given. Nobody is asked again,
+because as far as the store is concerned nothing changed.
+
+The inode alone was not enough, and the spec that proved it is why this is
+written down: a directory deleted and immediately recreated is routinely
+handed the same inode back, and the first version of this read as trusted
+through exactly that. Creation time separates them.
+
+You will be asked once more for projects trusted before this, which is the
+price of the store being checkable at all.

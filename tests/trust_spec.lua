@@ -57,3 +57,39 @@ describe("trusting a project to run its own programs", function()
     assert.are.same(root .. "/.venv/bin/ruff", require("util.lsp").project_bin("ruff", root))
   end)
 end)
+
+describe("a path that is not the directory it was", function()
+  local store
+
+  before_each(function()
+    store = vim.fn.tempname()
+    vim.env.XDG_STATE_HOME = vim.fs.dirname(store)
+  end)
+
+  it("is not trusted after the directory is replaced", function()
+    local path = vim.fn.tempname()
+    vim.fn.mkdir(path, "p")
+
+    trust.allow(path)
+    assert.is_true(trust.is_trusted(path))
+
+    -- The same path, a different directory: what happens when a project is
+    -- deleted and something else is created where it was. Trust recorded
+    -- against the path alone would follow, and here that means running
+    -- programs out of a directory nobody vouched for.
+    vim.fn.delete(path, "rf")
+    vim.fn.mkdir(path, "p")
+
+    assert.is_false(trust.is_trusted(path))
+    vim.fn.delete(path, "rf")
+  end)
+
+  it("drops out of the list rather than lingering", function()
+    local path = vim.fn.tempname()
+    vim.fn.mkdir(path, "p")
+    trust.allow(path)
+    vim.fn.delete(path, "rf")
+
+    assert.is_false(vim.tbl_contains(trust.all(), path))
+  end)
+end)
