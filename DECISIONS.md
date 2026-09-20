@@ -1241,3 +1241,28 @@ What the gate prints on a failure was built for exactly this: the tail of
 nvim-dap's log, and, when that log is empty, the configurations the editor
 offers for the file. An empty log is a missing adapter; a short list is a
 missing configuration.
+
+---
+
+## 52. The browser debugger, and the one machine it will not start on
+
+**Needs nothing from you yet. Written down so it is not discovered twice.**
+
+Six languages stop on macOS in CI: python, typescript, c, cpp, rust, and julia
+where julia is installed. The seventh, TSX in a browser, does not --- and the
+reason is Chrome rather than the configuration.
+
+What is known: the runner has Google Chrome, the configuration finds it, the
+fixture is served and answers, the session starts, and js-debug logs
+`js-debug/launch`. Then nothing. No CDP traffic, no bound breakpoint, and no
+trace file even when one is asked for. The same commit, the same fixture and
+the same keys stop at `index.tsx:9` on Linux, in CI and here.
+
+Tried, in order: a longer wait; pinning the address to 127.0.0.1, since macOS
+resolves localhost to ::1 first and nothing answered there; a profile of the
+browser's own rather than the default one; serving with node after python's
+http.server bound nothing at all on that runner. The first, second and fourth
+were real defects and are fixed. The third changed nothing.
+
+So the macOS job runs the six, and the browser case is checked on Linux and by
+hand. The gap is here rather than hidden behind a green tick.
