@@ -1127,3 +1127,35 @@ the resolved path; only the spelling handed to the adapter changed.
 Adapters are looked for in mason as well as on PATH --- looking only at PATH
 reported codelldb missing on a machine where three languages debugged fine ---
 and a run that checked nothing fails rather than passing quietly.
+
+---
+
+## 48. TSX in a browser: what works, and what is still open
+
+**Needs your call: whether a browser belongs in the harness.**
+
+The real way TSX is debugged is the browser one: the page runs compiled
+JavaScript and the source map puts the breakpoint back on the line you wrote.
+`make-debug-fixtures.sh` now builds that fixture --- `index.tsx` compiled by
+the TypeScript the language server already ships, a source map beside it, a
+`package.json` whose dev script names port 5599.
+
+Verified: the configuration list the editor offers in a `.tsx` file is right,
+and the port is read out of the project rather than guessed ---
+
+    1. Run this file
+    2. Open a browser on http://localhost:5599
+    3. Attach to a browser started with --remote-debugging-port=9222
+    4. Launch file
+    5. Attach
+
+Not verified: either browser configuration actually stopping. `launch` needs a
+Chrome this machine does not have --- the only browser here is the one
+Playwright downloaded. `attach` against that browser, started with
+`--remote-debugging-port=9222` and answering on `/json/version`, sat at
+`Starting adapter pwa-chrome` and never connected; the same `js-debug-adapter`
+serves `pwa-node`, which stops fine, so this is the chrome side of it.
+
+Two ways forward, and this one is yours: install a real Chrome or Chromium on
+the machines that run the gate, or leave browser debugging checked by hand and
+keep the gate to the six adapters that need no browser.
