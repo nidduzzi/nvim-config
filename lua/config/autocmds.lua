@@ -35,18 +35,22 @@ vim.api.nvim_create_autocmd("FileType", {
 -- Trust decides whether the project's own programs run, which since git was
 -- gated includes the gutter signs and every diff. Without the question, the
 -- first sign of an untrusted project is a feature quietly missing.
--- Asked directly rather than from a startup event: LazyVim loads this file on
--- VeryLazy, so a VimEnter or User VeryLazy handler registered here is
--- registered after the event it waits for has already fired, and never runs.
--- Opening an untrusted repository asked nothing at all until this was found.
-vim.api.nvim_create_autocmd("DirChanged", {
+-- Asked when you first open a file from a project, not when the editor
+-- starts.
+--
+-- Two reasons. A startup event is the wrong hook: LazyVim loads this file on
+-- VeryLazy, so a VimEnter or User VeryLazy handler registered here waits for
+-- something that has already happened and never runs --- which is exactly
+-- what the first version did, silently. And the question is about this
+-- project's code, so the moment you open some of it is the moment it means
+-- something; opening the editor and closing it again asks nothing.
+vim.api.nvim_create_autocmd({ "BufReadPost", "DirChanged" }, {
   group = vim.api.nvim_create_augroup("dotfiles_trust_prompt", { clear = true }),
-  callback = function()
-    require("util.trust_menu").ask_if_untrusted()
+  callback = function(event)
+    local from = event.file ~= "" and vim.fs.dirname(event.file) or nil
+    require("util.trust_menu").ask_if_untrusted(from)
   end,
 })
-
-require("util.trust_menu").ask_if_untrusted()
 
 vim.api.nvim_create_user_command("DotfilesTrustProject", function()
   local lsp = require("util.lsp")

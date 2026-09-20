@@ -159,34 +159,14 @@ function M.ask_if_untrusted(root)
   end
   asked[root] = true
 
-  -- Late enough that snacks owns vim.ui.select: asked earlier, the question
-  -- goes to Neovim's own prompt, which draws under the dashboard and is
-  -- answered by the first key you press without you having read it.
-  vim.defer_fn(function()
-    -- Not on top of something you started in the meantime. A second and a
-    -- half is long enough to open a picker from the dashboard, and a menu
-    -- that appears over it takes the keys meant for it.
-    local busy = vim.fn.mode() ~= "n"
-    local ok, pickers = pcall(function()
-      return Snacks.picker.get()
-    end)
-    busy = busy or (ok and #pickers > 0)
-
-    if busy then
-      vim.notify(
-        table.concat({
-          ("git is not run in %s, which nobody has vouched for."):format(vim.fn.fnamemodify(root, ":~")),
-          "",
-          "<leader>gt to decide.",
-        }, "\n"),
-        vim.log.levels.WARN,
-        { title = "Untrusted project" }
-      )
-      return
-    end
-
+  -- Immediately, because by the time a file has been read snacks already
+  -- owns vim.ui.select and you have not had time to type anything. The first
+  -- version waited a second and a half for snacks to be ready, and that delay
+  -- was the whole problem: it landed on whatever you had started in the
+  -- meantime, and took the keys meant for it.
+  vim.schedule(function()
     M.open(root)
-  end, 1500)
+  end)
 end
 
 return M

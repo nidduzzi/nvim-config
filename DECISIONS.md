@@ -1059,14 +1059,20 @@ The third writes `git_project = true` into the machine-local settings file,
 which is the answer for a laptop that only ever holds your own repositories.
 It edits one line and leaves the rest of that file alone.
 
-Two things the driving found:
+**When it asks:** on the first file read from a project, not at startup.
 
 `VimEnter` and `User VeryLazy` both fire before `lua/config/autocmds.lua` is
-loaded, because LazyVim loads that file *on* VeryLazy. A handler registered
-there waits for an event that has already happened, and never runs: opening an
-untrusted repository asked nothing at all.
+loaded, because LazyVim loads that file *on* VeryLazy, so a handler
+registered there waits for something that has already happened and never runs
+--- which is what the first version did, silently. `BufReadPost` is also the
+better moment on its own terms: the question is about this project's code, so
+opening some of it is when it means anything, and starting the editor and
+closing it again asks nothing.
 
-A menu that appears a second and a half after startup lands on top of whatever
-you started in the meantime, and takes the keys meant for it. If anything is
-already open --- a picker from the dashboard, insert mode --- the question
-becomes a notification naming `<leader>gt` instead.
+**The delay was the bug.** The first version waited 1.5 seconds so that snacks
+would own `vim.ui.select`, then guessed whether you looked busy and fell back
+to a notification. Both of those were working around the delay. By the time a
+file has been read snacks is already loaded, so the question can arrive with
+the file --- before there is anything to interrupt. Driven frame by frame: the
+picker closes, the file appears with the menu over it, `<Esc>` dismisses it,
+and what you type next lands in the file.
