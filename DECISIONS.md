@@ -846,3 +846,27 @@ holds nothing.
 Only the first 400 lines are read. A credential at the bottom of a ten
 thousand line file is not what this is for, and reading all of one on every
 question is.
+
+---
+
+## 39. What the editor writes about you is yours to read
+
+**Decided:** the state this configuration writes — the trust store, the
+recall lists, the agent's session files — is created 0600, in directories
+created 0700, and files already there are narrowed when the directory is next
+used.
+
+**Against:** the process umask, which is what it used and which is usually
+0022.
+
+**On:** none of it is a key. All of it is about you: what you asked the agent,
+which projects you have trusted, which conversation belongs to which project.
+On a shared machine, world-readable means the next account along can read your
+questions. This was 0664 and 0755 on this machine, and the migration matters
+because a state directory that predates the change keeps the old modes until
+something writes to it.
+
+Neovim's `writefile` takes no mode, so these are written and then narrowed.
+The gap between the two is a race nobody can win from another account without
+already watching the directory, and closing it properly would mean writing
+through `vim.uv` by hand for a state file holding a question.

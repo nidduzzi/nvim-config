@@ -84,7 +84,7 @@ end
 ---@return string
 local function session_file(root)
   local dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "nvim-agent")
-  vim.fn.mkdir(dir, "p")
+  require("util.private").mkdir(dir)
   return vim.fs.joinpath(dir, ("%s-%s"):format(M.config.backend, vim.fn.sha256(root):sub(1, 16)))
 end
 
@@ -110,10 +110,12 @@ end
 ---@param root string
 ---@param id string
 local function write_session(root, id)
-  local fd = io.open(session_file(root), "w")
+  local path = session_file(root)
+  local fd = io.open(path, "w")
   if fd then
     fd:write(id)
     fd:close()
+    require("util.private").narrow(path)
   end
 end
 

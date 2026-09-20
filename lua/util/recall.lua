@@ -23,7 +23,7 @@ M.limit = 30
 ---@return string
 local function store(kind, root)
   local dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "recall", kind)
-  vim.fn.mkdir(dir, "p")
+  require("util.private").mkdir(dir)
   return vim.fs.joinpath(dir, vim.fn.sha256(root):sub(1, 16))
 end
 
@@ -78,10 +78,12 @@ function M.add(kind, value)
     end
   end
 
-  local fd = io.open(store(kind, root()), "w")
+  local path = store(kind, root())
+  local fd = io.open(path, "w")
   if fd then
     fd:write(table.concat(kept, "\n") .. "\n")
     fd:close()
+    require("util.private").narrow(path)
   end
 end
 

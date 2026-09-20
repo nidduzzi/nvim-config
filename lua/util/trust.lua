@@ -70,8 +70,9 @@ function M.allow(root)
     return
   end
 
+  local private = require("util.private")
   local store = M.store()
-  vim.fn.mkdir(vim.fs.dirname(store), "p")
+  private.mkdir(vim.fs.dirname(store))
 
   local kept = {}
   for _, line in ipairs(vim.uv.fs_stat(store) and vim.fn.readfile(store) or {}) do
@@ -82,7 +83,7 @@ function M.allow(root)
   end
 
   table.insert(kept, ("%s\t%s"):format(path, now))
-  vim.fn.writefile(kept, store)
+  private.writefile(store, kept)
 end
 
 ---@param root string
@@ -99,7 +100,7 @@ function M.revoke(root)
       table.insert(kept, line)
     end
   end
-  vim.fn.writefile(kept, store)
+  require("util.private").writefile(store, kept)
 end
 
 --- Every root still trusted: still on disk, and still the same directory.
