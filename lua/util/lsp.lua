@@ -211,6 +211,33 @@ function M.project_bin(name, start)
   end
 end
 
+--- A program from PATH, unless PATH leads back into an untrusted project.
+---
+--- venv-selector activates a project's virtualenv, and activating one puts
+--- its bin directory on PATH. After that `exepath` answers with a program
+--- from the project without anything having looked in the project, which is
+--- the check this module exists to make. The same is true of direnv, of a
+--- shell that was started inside the project, and of anything else that
+--- arranges PATH before the editor starts.
+---@param name string
+---@param start? string directory to judge the project from
+---@return string the path, or "" when nothing safe answers
+function M.safe_exepath(name, start)
+  local found = vim.fn.exepath(name)
+  if found == "" then
+    return ""
+  end
+
+  local root = M.root(start or vim.fn.getcwd())
+  local inside = vim.fs.relpath(root, found)
+  if inside and not inside:match("^%.%.") and not may_run_project_bin(root) then
+    say_refused(root, found)
+    return ""
+  end
+
+  return found
+end
+
 --- Where a server's command would come from, if anywhere.
 ---@param name string server name, as lspconfig knows it
 ---@return { cmd: string[], source: "project"|"PATH" }|nil

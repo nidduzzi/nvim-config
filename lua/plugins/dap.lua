@@ -55,7 +55,8 @@ end
 ---@return string|nil path
 ---@return string|nil refused
 local function anywhere(root, name)
-  local found = in_project(root, name) or (vim.fn.executable(name) == 1 and vim.fn.exepath(name) or nil)
+  local from_path = require("util.lsp").safe_exepath(name, root)
+  local found = in_project(root, name) or (from_path ~= "" and from_path or nil)
   if not found then
     return nil, nil
   end

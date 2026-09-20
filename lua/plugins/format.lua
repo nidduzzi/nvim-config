@@ -39,9 +39,10 @@ local function guarded(name)
     if from_project then
       return from_project
     end
-    -- exepath is empty when nothing on PATH answers, and conform reports the
-    -- formatter as unavailable rather than running something unintended.
-    return vim.fn.exepath(name)
+    -- Not exepath directly: a virtualenv activated by venv-selector, or a
+    -- direnv layout, puts the project's own bin directory on PATH, and then
+    -- "from PATH" is the project's program by another road.
+    return lsp.safe_exepath(name, ctx and ctx.dirname or nil)
   end
 end
 

@@ -744,3 +744,32 @@ untrusted project, because it is not the project's program.
 This is the third program-from-a-project path: language servers (guarded
 already), debug adapters (guarded already), and formatters. `<leader>cf` and
 format-on-save were the only one of the three that ran without asking.
+
+---
+
+## 36. "From PATH" can still mean "from the project"
+
+**Decided:** `util.lsp.safe_exepath` replaces `vim.fn.exepath` wherever this
+configuration decides which program to run. It refuses a result that lies
+inside an untrusted project.
+
+**Against:** treating PATH as the safe fallback, which is what 35 had just
+made it.
+
+**On:** venv-selector activates a project's virtualenv, and activating one
+puts its `bin` on PATH. direnv does the same, and so does a shell started
+inside the project. After that, `exepath("prettierd")` answers with the
+project's program without anything having looked in the project --- so the
+gate added an hour earlier could be walked around by a repository shipping a
+`.envrc`, and the editor would have called it a program from PATH.
+
+Demonstrated in the same repository as 35, with its `node_modules/.bin` put on
+PATH before the file was opened:
+
+    exepath says:       <repo>/node_modules/.bin/prettierd
+    safe_exepath says:
+    formatters:
+    ran: false
+
+stylua from Mason still formats, and codelldb still starts a debug session,
+because neither is inside the project being judged.
