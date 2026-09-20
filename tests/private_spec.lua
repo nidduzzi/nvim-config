@@ -1,5 +1,11 @@
 local private = require("util.private")
 
+-- Windows has no POSIX mode bits: NTFS reports 666 whatever chmod was asked
+-- for, and privacy there is an ACL question. What these check on Windows is
+-- that the calls do what they say and write the file; the mode is asserted
+-- where the filesystem has one.
+local posix = vim.fn.has("win32") == 0
+
 describe("state this editor writes about you", function()
   ---@param mode integer
   ---@return string
@@ -11,7 +17,10 @@ describe("state this editor writes about you", function()
     local path = vim.fn.tempname()
     private.writefile(path, { "what you asked the agent" })
 
-    assert.equal("600", octal(vim.uv.fs_stat(path).mode))
+    assert.is_truthy(vim.uv.fs_stat(path))
+    if posix then
+      assert.equal("600", octal(vim.uv.fs_stat(path).mode))
+    end
     vim.fn.delete(path)
   end)
 
@@ -19,7 +28,10 @@ describe("state this editor writes about you", function()
     local path = vim.fs.joinpath(vim.fn.tempname(), "recall", "ask")
     private.mkdir(path)
 
-    assert.equal("700", octal(vim.uv.fs_stat(path).mode))
+    assert.is_truthy(vim.uv.fs_stat(path))
+    if posix then
+      assert.equal("700", octal(vim.uv.fs_stat(path).mode))
+    end
     vim.fn.delete(path, "rf")
   end)
 
@@ -31,7 +43,10 @@ describe("state this editor writes about you", function()
 
     private.narrow(path)
 
-    assert.equal("600", octal(vim.uv.fs_stat(path).mode))
+    assert.is_truthy(vim.uv.fs_stat(path))
+    if posix then
+      assert.equal("600", octal(vim.uv.fs_stat(path).mode))
+    end
     vim.fn.delete(path)
   end)
 end)
@@ -46,8 +61,11 @@ describe("the trust store", function()
     vim.fn.mkdir(project, "p")
     trust.allow(project)
 
-    local mode = vim.uv.fs_stat(trust.store()).mode
-    assert.equal("600", ("%o"):format(bit.band(mode, tonumber("777", 8))))
+    assert.is_truthy(vim.uv.fs_stat(trust.store()))
+    if posix then
+      local mode = vim.uv.fs_stat(trust.store()).mode
+      assert.equal("600", ("%o"):format(bit.band(mode, tonumber("777", 8))))
+    end
 
     vim.fn.delete(project, "rf")
     vim.fn.delete(state, "rf")

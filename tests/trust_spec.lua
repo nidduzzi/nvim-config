@@ -3,13 +3,23 @@ local trust = require("util.trust")
 
 describe("trusting a project to run its own programs", function()
   local root
+  local ruff
+
+  -- A virtualenv is laid out differently on Windows: the programs are in
+  -- Scripts rather than bin, and an executable is ruff.exe rather than ruff.
+  -- util.lsp knows both; a fixture that only builds the POSIX one is testing
+  -- the platform it was written on.
+  local windows = vim.fn.has("win32") == 1
+  local bin = windows and "Scripts" or "bin"
+  local program = windows and "ruff.exe" or "ruff"
 
   before_each(function()
     root = vim.fn.tempname()
-    vim.fn.mkdir(root .. "/.venv/bin", "p")
+    ruff = table.concat({ root, ".venv", bin, program }, "/")
+    vim.fn.mkdir(vim.fs.dirname(ruff), "p")
     vim.fn.writefile({ "home = /usr/bin", "version = 3.12.0" }, root .. "/.venv/pyvenv.cfg")
-    vim.fn.writefile({ "#!/bin/sh", "exit 0" }, root .. "/.venv/bin/ruff")
-    vim.fn.setfperm(root .. "/.venv/bin/ruff", "rwxr-xr-x")
+    vim.fn.writefile({ "#!/bin/sh", "exit 0" }, ruff)
+    vim.fn.setfperm(ruff, "rwxr-xr-x")
     settings.clear("lsp_project_bin")
     trust.revoke(root)
   end)
@@ -30,7 +40,7 @@ describe("trusting a project to run its own programs", function()
 
   it("runs it once the project is trusted", function()
     trust.allow(root)
-    assert.are.same(root .. "/.venv/bin/ruff", require("util.lsp").project_bin("ruff", root))
+    assert.are.same(ruff, require("util.lsp").project_bin("ruff", root))
   end)
 
   it("refuses it again after the trust is revoked", function()
@@ -40,7 +50,7 @@ describe("trusting a project to run its own programs", function()
   end)
 
   it("derives the bin directory from the marker, not from a list", function()
-    assert.are.same({ ".venv/bin" }, require("util.lsp").bin_dirs(root))
+    assert.are.same({ ".venv/" .. bin }, require("util.lsp").bin_dirs(root))
 
     vim.fn.delete(root .. "/.venv/pyvenv.cfg")
     assert.are.same({}, require("util.lsp").bin_dirs(root))
@@ -54,7 +64,7 @@ describe("trusting a project to run its own programs", function()
 
   it("always runs one when the setting says always", function()
     settings.set("lsp_project_bin", true)
-    assert.are.same(root .. "/.venv/bin/ruff", require("util.lsp").project_bin("ruff", root))
+    assert.are.same(ruff, require("util.lsp").project_bin("ruff", root))
   end)
 end)
 

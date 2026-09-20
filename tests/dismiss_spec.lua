@@ -66,4 +66,3 @@ describe("one key closes what is open", function()
     assert.is_nil(dismiss.overlay_window())
   end)
 end)
-

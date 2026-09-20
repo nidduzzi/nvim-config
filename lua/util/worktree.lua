@@ -101,9 +101,14 @@ function M.switch(path, in_tab)
   vim.notify(vim.fn.fnamemodify(path, ":~"), vim.log.levels.INFO, { title = "Worktree" })
 
   -- Sessions, pickers and the file tree all key off the working directory, so
-  -- open the picker again rather than leaving the old root on screen.
+  -- open the picker again rather than leaving the old root on screen. Only
+  -- when there is a picker: this module is also called from a spec, where
+  -- the error arrived later as "attempt to index global 'Snacks'" from a
+  -- scheduled callback, long after the test it belonged to had passed.
   vim.schedule(function()
-    Snacks.picker.files()
+    if Snacks and Snacks.picker then
+      Snacks.picker.files()
+    end
   end)
 end
 

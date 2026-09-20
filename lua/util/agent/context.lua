@@ -25,12 +25,8 @@ local function may_send(bufnr)
     return true
   end
 
-  local answer = vim.fn.confirm(
-    ("This looks like %s.\n\nSending it puts its contents in the prompt."):format(recognised),
-    "&Do not send\n&Send it anyway",
-    1,
-    "Warning"
-  )
+  local answer =
+    vim.fn.confirm(("This looks like %s.\n\nSending it puts its contents in the prompt."):format(recognised), "&Do not send\n&Send it anyway", 1, "Warning")
   return answer == 2
 end
 

@@ -104,10 +104,7 @@ function M.check()
     "Project directories that are searched first:",
     -- bin_dirs returns the ones that exist, so in a project with none this
     -- line was a heading followed by nothing, which reads as a bug.
-    "  " .. (next(lsp.bin_dirs(lsp.root(vim.fn.getcwd()))) and table.concat(
-      lsp.bin_dirs(lsp.root(vim.fn.getcwd())),
-      "  "
-    ) or "none in this project"),
+    "  " .. (next(lsp.bin_dirs(lsp.root(vim.fn.getcwd()))) and table.concat(lsp.bin_dirs(lsp.root(vim.fn.getcwd())), "  ") or "none in this project"),
   }, "\n"))
 end
 

@@ -9,6 +9,11 @@
 --- Neovim writes with the process umask, which is usually 0022 and so 0644.
 --- These are written and then narrowed, because there is no way to ask
 --- writefile for a mode.
+---
+--- On Windows the mode bits do not exist: NTFS reports 666 whatever chmod is
+--- asked for, and privacy is an access control list. The calls below are
+--- harmless there, and the state directory is already under the user's own
+--- AppData.
 
 local M = {}
 
