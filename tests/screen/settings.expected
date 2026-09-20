@@ -4,7 +4,6 @@
                       ██║     ██╔══██║ ███╔╝    ╚██╔╝  ╚██╗ ██╔╝██║██║╚██╔╝██║ z
                       ███████╗██║  ██║███████╗   ██║    ╚████╔╝ ██║██║ ╚═╝ ██║
                       ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝     ╚═╝
-
                        ╭ Settings ──────────────────────────────────────────────────╮
                        │Settings, and where each value came from:                   │
                        │                                                            │
@@ -13,6 +12,7 @@
                        │agent_model           (unset)  the backend decides          │
                        │agent_timeout         90000    built in                     │
                        │agent_trust           context  built in                     │
+                       │git_project           ask      built in                     │
                        │lsp_ignore            {}       built in                     │
                        │lsp_project_bin       ask      built in                     │
                        │search_preset         code     built in                     │
