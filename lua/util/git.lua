@@ -30,6 +30,11 @@ end
 ---@param root? string
 ---@return boolean
 function M.allowed(root)
+  local allowed = require("util.settings").get("git_project")
+  if allowed == true or allowed == false then
+    return allowed
+  end
+
   root = require("util.lsp").root(root or vim.fn.getcwd())
 
   if answered[root] == nil then
@@ -59,7 +64,8 @@ function M.say_refused(root)
       "A repository's own .git/config can name programs git will run:",
       "textconv on a diff, and core.fsmonitor on almost anything.",
       "",
-      ":DotfilesTrustProject to use git here.",
+      ":DotfilesTrustProject to use git here, or set git_project to true",
+      "for a machine that only holds your own repositories.",
     }, "\n"),
     vim.log.levels.WARN,
     { title = "Untrusted project" }

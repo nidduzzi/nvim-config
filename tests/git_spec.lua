@@ -1,5 +1,6 @@
 local git = require("util.git")
 local trust = require("util.trust")
+local settings = require("util.settings")
 
 describe("running git in a project", function()
   local root
@@ -12,6 +13,7 @@ describe("running git in a project", function()
 
   after_each(function()
     trust.revoke(root)
+    settings.clear("git_project")
     git.forget()
     vim.fn.delete(root, "rf")
   end)
@@ -33,6 +35,18 @@ describe("running git in a project", function()
 
     trust.revoke(root)
     git.forget()
+    assert.is_false(git.allowed(root))
+  end)
+
+  it("runs everywhere when the setting says so, for a machine of your own repositories", function()
+    settings.set("git_project", true)
+    assert.is_true(git.allowed(root))
+  end)
+
+  it("runs nowhere when the setting says so, whatever the trust store holds", function()
+    trust.allow(root)
+    git.forget()
+    settings.set("git_project", false)
     assert.is_false(git.allowed(root))
   end)
 

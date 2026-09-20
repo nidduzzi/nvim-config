@@ -1020,6 +1020,11 @@ until then a visibly emptier editor --- no gutter signs is the one you will
 notice. The command now reloads the buffer, so gitsigns attaches immediately
 rather than on the next open.
 
+**The way out:** `git_project` is a setting like every other, so a machine
+that only ever holds your own repositories can put `git_project = true` in its
+`local.lua` and never see the prompt; `false` refuses everywhere. The default
+is `"ask"`, which means trusted projects only.
+
 **What changed for search:** in an untrusted project the extension and glob
 filters come from ripgrep rather than git, so they include untracked files.
 Same ignore rules, slightly different answer, and the specs say which is
