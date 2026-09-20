@@ -296,3 +296,31 @@ undefined. Now time, then path.
 
 The other four were already total: window ids are unique integers, and command
 and capability names are unique within their lists.
+
+---
+
+## 17. Grep ranking is checked on the screen, not in a spec
+
+**Decided:** a screen test greps for a symbol and the committed frame shows
+the declaration above the reference.
+
+**Against:** a unit spec calling `rank_item` directly.
+
+**On:** the spec needs treesitter's `locals` query, which Neovim does not ship
+for Lua — nvim-treesitter provides it. Adding nvim-treesitter to the spec
+bootstrap made it clone twenty-seven thousand objects and still not install a
+parser in time. A spec that cannot see a parser tests an absence.
+
+The screen test uses the real editor, where the parser is already there.
+
+Two things it exposed:
+
+Ranking is applied through `search.opts`, which sets `transform`. Calling
+`Snacks.picker.grep()` directly skips it, and my first probe did exactly that
+and reported every `score_mul` as nil — the feature looked inert when it was
+the probe that was wrong.
+
+The ranked item is stable; the unranked tail is not. Everything without a
+declaration scores 1010, and snacks has no tiebreaker for equal scores, so two
+such rows swap between runs. The test greps for a symbol whose hits cannot
+tie rather than asserting an order the picker does not promise.
