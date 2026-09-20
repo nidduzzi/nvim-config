@@ -21,6 +21,23 @@ map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 -- check rather than by noticing the feature had gone.
 map("n", "<leader>xD", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
 
+-- The git pickers are LazyVim's, and they run git. Rebound here so an
+-- untrusted project gets the refusal rather than the repository's own
+-- programs. See util/git.lua.
+for key, picker in pairs({
+  ["<leader>gs"] = "git_status",
+  ["<leader>gl"] = "git_log",
+  ["<leader>gL"] = "git_log_line",
+  ["<leader>gb"] = "git_log_line",
+  ["<leader>gf"] = "git_log_file",
+}) do
+  map("n", key, function()
+    require("util.git").guard(function()
+      Snacks.picker[picker]()
+    end)
+  end, { desc = "Git: " .. picker:gsub("_", " ") })
+end
+
 -- Watch the keys this config depends on. Something taking one of these means a
 -- feature quietly stopped existing, which is worth hearing about when it
 -- happens rather than when it is next needed.

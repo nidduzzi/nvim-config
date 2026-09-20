@@ -207,16 +207,24 @@ local function project_files()
     return file_cache[where]
   end
 
-  local found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
+  -- git only where git may run: core.fsmonitor makes even ls-files a program
+  -- the repository chose. ripgrep reads the same ignore files and runs
+  -- nothing the project named.
+  local found, listed = {}, false
+  if require("util.git").allowed(where) then
+    found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
+    listed = vim.v.shell_error == 0
+  end
 
-  if vim.v.shell_error ~= 0 and vim.fn.executable("rg") == 1 then
+  if not listed and vim.fn.executable("rg") == 1 then
     found = vim.fn.systemlist({ "rg", "--files", "--color=never", where })
     for index, path in ipairs(found) do
       found[index] = vim.fs.relpath(where, path) or path
     end
+    listed = vim.v.shell_error == 0
   end
 
-  if vim.v.shell_error ~= 0 then
+  if not listed then
     found = vim.fs.find(function(name, path)
       return not is_vendored(path)
     end, { path = where, type = "file", limit = 4000 })

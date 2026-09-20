@@ -798,10 +798,8 @@ container volume can. Git's own protections here are about ownership
 The editor's own git calls pass no user-controlled diff drivers, but gitsigns
 and diffview issue their own, and neither takes `--no-textconv` from us.
 
-**Yours to decide:** whether to run git-backed features only in trusted
-projects, at the cost of asking for every repository you browse. My view is
-no --- the cost is daily and the vector needs a directory that arrived by
-some means other than a clone.
+**Decided by you, against my recommendation, and implemented in 44:** git
+features run only in trusted projects.
 
 Also verified while looking: `exrc` is safe. A `.nvim.lua` in an untrusted
 project does not run. Neovim asks, and the editor does not finish starting
@@ -996,3 +994,38 @@ Also driven in the same pass, and correct: session save and restore through
 persistence.nvim (two buffers and the working directory came back), grug-far's
 search-and-replace window, and `<c-c>` closing it --- it is a `nofile` buffer,
 so the rule from 32 covers a plugin nobody had tested against.
+
+---
+
+## 44. git runs only where the project is trusted
+
+**Decided:** every git-backed feature this configuration wires up is refused
+in a project that has not been trusted. Your call, against my recommendation
+in 37.
+
+**What it covers:** gitsigns does not attach --- no signs, no hunk preview, no
+blame; `<leader>gd`, `<leader>gf`, `<leader>gm`, `<leader>gw` and `<leader>gW`
+report the refusal; the git pickers on `<leader>gs`, `<leader>gl`,
+`<leader>gL`, `<leader>gb` and `<leader>gf` are rebound through the same
+guard; `util.worktree` and `util.diff` go through it; and `recall` stops
+asking `git ls-files`, falling back to ripgrep, which reads the same ignore
+files and runs nothing the repository named.
+
+**Why any git command and not only the diffs:** `textconv` is the one that is
+easy to demonstrate, but `core.fsmonitor` names a program that almost every
+git command runs, `status` included. Gating only the diffs would leave that.
+
+**The cost, stated plainly:** one `:DotfilesTrustProject` per repository, and
+until then a visibly emptier editor --- no gutter signs is the one you will
+notice. The command now reloads the buffer, so gitsigns attaches immediately
+rather than on the next open.
+
+**What changed for search:** in an untrusted project the extension and glob
+filters come from ripgrep rather than git, so they include untracked files.
+Same ignore rules, slightly different answer, and the specs say which is
+which.
+
+**Verified:** the repository from 37, with its `textconv` still in place ---
+`<leader>ghp`, `<leader>gd` and `<leader>gs` run nothing. After
+`:DotfilesTrustProject` the same keys run it, which is what trusting a project
+means.

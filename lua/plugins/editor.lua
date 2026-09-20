@@ -102,6 +102,35 @@ return {
   -- same reason. Upstream has not been pushed since 2024-08 and its "is this
   -- repo active?" issue is unanswered; and the fork ships `:DiffviewToggle`,
   -- which is exactly the open-outside-close-inside behaviour this configuration
+  -- git runs programs a repository names in its own .git/config, so gitsigns
+  -- does not attach to a project that has not been trusted: no signs, no hunk
+  -- preview, no blame, and one message saying why. See util/git.lua and
+  -- DECISIONS 44.
+  {
+    "lewis6991/gitsigns.nvim",
+    optional = true,
+    opts = function(_, opts)
+      local theirs = opts.on_attach
+
+      opts.on_attach = function(bufnr)
+        local git = require("util.git")
+        local name = vim.api.nvim_buf_get_name(bufnr)
+        local root = name ~= "" and vim.fs.dirname(name) or nil
+
+        if not git.allowed(root) then
+          git.say_refused(root)
+          return false
+        end
+
+        if theirs then
+          return theirs(bufnr)
+        end
+      end
+
+      return opts
+    end,
+  },
+
   -- had written by hand. The module path is unchanged, so `require("diffview")`
   -- and every action name still resolve.
   {
@@ -110,7 +139,11 @@ return {
     keys = {
       {
         "<leader>gd",
-        "<cmd>DiffviewToggle<cr>",
+        function()
+          require("util.git").guard(function()
+            vim.cmd("DiffviewToggle")
+          end)
+        end,
         desc = "Diff: working tree (toggle)",
       },
       {
@@ -120,28 +153,36 @@ return {
           -- takes its arguments, and there is no file-history toggle. The
           -- documented command list has DiffviewFileHistory and no toggling
           -- form of it.
-          require("util.diff").toggle("DiffviewFileHistory %")
+          require("util.git").guard(function()
+            require("util.diff").toggle("DiffviewFileHistory %")
+          end)
         end,
         desc = "Diff: history of this file (toggle)",
       },
       {
         "<leader>gm",
         function()
-          require("util.diff").toggle_merge()
+          require("util.git").guard(function()
+            require("util.diff").toggle_merge()
+          end)
         end,
         desc = "Diff: merge conflicts (toggle)",
       },
       {
         "<leader>gw",
         function()
-          require("util.worktree").pick()
+          require("util.git").guard(function()
+            require("util.worktree").pick()
+          end)
         end,
         desc = "Worktrees: switch",
       },
       {
         "<leader>gW",
         function()
-          require("util.worktree").pick_branch()
+          require("util.git").guard(function()
+            require("util.worktree").pick_branch()
+          end)
         end,
         desc = "Worktrees: check out a branch beside this one",
       },
