@@ -47,7 +47,14 @@ vim.api.nvim_create_autocmd("FileType", {
 vim.api.nvim_create_autocmd({ "BufReadPost", "DirChanged" }, {
   group = vim.api.nvim_create_augroup("dotfiles_trust_prompt", { clear = true }),
   callback = function(event)
-    local from = event.file ~= "" and vim.fs.dirname(event.file) or nil
+    -- BufReadPost reports the file, and the project is the directory holding
+    -- it. DirChanged reports the directory itself, and taking its parent asks
+    -- about the wrong place --- which asked about nothing at all, because the
+    -- parent of a project is rarely a project.
+    local from = nil
+    if event.file ~= "" then
+      from = event.event == "DirChanged" and event.file or vim.fs.dirname(event.file)
+    end
     require("util.trust_menu").ask_if_untrusted(from)
   end,
 })

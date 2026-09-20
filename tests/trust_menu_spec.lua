@@ -146,3 +146,32 @@ describe("asking about a project", function()
     assert.is_truthy(asked[1].items[1]:match("Stop trusting"))
   end)
 end)
+
+describe("arriving in a project by changing directory", function()
+  it("asks about the directory moved into, not its parent", function()
+    -- DirChanged reports the new directory; BufReadPost reports a file. The
+    -- handler took the parent of both, so changing into a project asked about
+    -- the directory above it -- which is rarely a project, so it asked
+    -- nothing at all.
+    local root = vim.fn.tempname()
+    vim.fn.mkdir(vim.fs.joinpath(root, ".git"), "p")
+
+    local asked = {}
+    local previous = vim.ui.select
+    vim.ui.select = function(_, opts)
+      asked[#asked + 1] = opts and opts.prompt or ""
+    end
+
+    require("util.trust_menu").forget()
+    require("util.trust_menu").ask_if_untrusted(root)
+    vim.wait(1500, function()
+      return #asked > 0
+    end, 50)
+
+    vim.ui.select = previous
+    assert.equal(1, #asked)
+    assert.is_truthy(asked[1]:match(vim.fn.fnamemodify(root, ":t")))
+
+    vim.fn.delete(root, "rf")
+  end)
+end)
