@@ -1199,3 +1199,23 @@ search, which entry 46 measured, and nothing before that.
 
 Five of fifty plugins load before the dashboard is drawn, which is what
 `check-startup-plugins.sh` holds still.
+
+---
+
+## 51. Six debuggers stop on a runner that had none of them
+
+The debugger gate went green in CI only after two things that both looked like
+a broken debugger:
+
+    MasonInstall … +qa      the install is asynchronous; the editor quit first
+    :MasonInstall           E492, because nothing had loaded mason yet
+
+Both left the runner without `js-debug-adapter`, so the TypeScript session
+never started --- and a session that never starts draws the same frame as one
+that started and did not stop. The install goes through `mason-registry` now,
+waits for the binaries, and fails in its own step rather than in the gate.
+
+What the gate prints on a failure was built for exactly this: the tail of
+nvim-dap's log, and, when that log is empty, the configurations the editor
+offers for the file. An empty log is a missing adapter; a short list is a
+missing configuration.
