@@ -451,3 +451,23 @@ Two paths were built with `..` and a literal slash.
 macOS runner in `harness.yml` would verify the first three; the screens would
 need a terminal that draws the same way, which is the part that makes it a
 decision rather than a task.
+
+---
+
+## 24. A gate that cannot run has to say so
+
+**Decided:** `run-probes.sh` clears its output directory before a run and
+fails when a report is missing.
+
+**Against:** the previous behaviour, which printed `did not run` and exited 0.
+
+**On:** `stress-probe.lua` read `util.lsp.bin_dirs` as a table. It became a
+function when the binary directories started being derived from the project,
+so the probe died on that line and wrote nothing — and the gate printed
+whatever `stress.txt` was left in `/tmp/nvim-probes` from the run before.
+Against the nine-file fixture it reported label-studio's 5626 tracked files,
+30.8% documentation, and no errors.
+
+Compiling is not running: `check-syntax.sh` was happy with that file
+throughout. The probes are now in CI against the fixture, because they are the
+only gate that executes these modules rather than loading them.
