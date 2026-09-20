@@ -11,6 +11,29 @@
 
 local M = {}
 
+--- Ask before sending a buffer that looks like it holds a credential.
+---
+--- Everything the agent is shown comes through this file, so one check here
+--- covers the question, the review, and anything added later. The answer is
+--- not remembered: the next question about the same file asks again, because
+--- the cost of a wrong yes is a key in somebody else's logs.
+---@param bufnr integer
+---@return boolean
+local function may_send(bufnr)
+  local recognised = require("util.agent.secrets").found(bufnr)
+  if not recognised then
+    return true
+  end
+
+  local answer = vim.fn.confirm(
+    ("This looks like %s.\n\nSending it puts its contents in the prompt."):format(recognised),
+    "&Do not send\n&Send it anyway",
+    1,
+    "Warning"
+  )
+  return answer == 2
+end
+
 ---@class agent.Context
 ---@field text string the numbered source
 ---@field first integer buffer line the snippet starts on, 1-based
@@ -33,9 +56,12 @@ end
 
 --- The whole buffer.
 ---@param bufnr? integer
----@return agent.Context
+---@return agent.Context|nil
 function M.buffer(bufnr)
   bufnr = bufnr or 0
+  if not may_send(bufnr) then
+    return nil
+  end
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   return {
     text = numbered(lines, 1),
@@ -51,6 +77,10 @@ function M.selection()
   local from = vim.fn.getpos("'<")
   local to = vim.fn.getpos("'>")
   if from[2] == 0 or to[2] == 0 then
+    return nil
+  end
+
+  if not may_send(0) then
     return nil
   end
 
@@ -70,9 +100,12 @@ end
 
 --- The function or block the cursor is in, found with treesitter, falling back
 --- to a window of lines when there is no parser for the language.
----@return agent.Context
+---@return agent.Context|nil
 function M.around_cursor()
   local bufnr = 0
+  if not may_send(bufnr) then
+    return nil
+  end
   local row = vim.api.nvim_win_get_cursor(0)[1]
 
   local ok, node = pcall(vim.treesitter.get_node)

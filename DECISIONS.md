@@ -815,3 +815,34 @@ Also verified while looking: `exrc` is safe. A `.nvim.lua` in an untrusted
 project does not run. Neovim asks, and the editor does not finish starting
 until it is answered --- the harness reports "Neovim did not become ready",
 which is the prompt waiting.
+
+---
+
+## 38. The agent asks before it is shown a credential
+
+**Decided:** everything the agent is shown goes through `util.agent.context`,
+and that file now asks first when the buffer looks like it holds a
+credential. The answer is not remembered.
+
+**Against:** relying on the rung ladder, which decides *whether* code is sent
+but not *which* code.
+
+**On:** the ladder's second rung and above put the buffer in the prompt. If
+the buffer is a `.env`, the prompt is the `.env`. Nothing said so, and the
+question that sends it is the ordinary one --- `<leader>aa` on the file you
+happen to be looking at.
+
+Two kinds of recognition, because neither is enough alone: the filename, for
+a `.env` that is empty today and full tomorrow, and the contents, for a key
+pasted into a scratch buffer with no telling name. The token patterns are the
+prefixes the issuers document --- `AKIA`, `ghp_`, `sk-ant-`, `xoxb-`, `AIza`
+--- so a match says something about the token's format rather than guessing at
+the word before it.
+
+`.env.example` and `secrets.sample.yaml` are left alone. A template is the
+shape of a configuration, which is a reasonable thing to ask about, and it
+holds nothing.
+
+Only the first 400 lines are read. A credential at the bottom of a ten
+thousand line file is not what this is for, and reading all of one on every
+question is.

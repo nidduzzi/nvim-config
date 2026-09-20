@@ -77,6 +77,9 @@ end
 function M.explain()
   local diagnostics = context.diagnostics_here()
   local ctx = context.here()
+  if not ctx then
+    return
+  end
 
   local prompt = table.concat({
     diagnostics ~= "" and "Explain what this error means and what causes it." or "Explain what this code does.",
@@ -127,6 +130,9 @@ function M.ask(question)
     }
     if with_code then
       local ctx = context.here()
+      if not ctx then
+        return
+      end
       vim.list_extend(lines, { "", ("Code (%s):"):format(ctx.name), ctx.text })
     end
 
