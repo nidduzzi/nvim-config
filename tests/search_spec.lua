@@ -49,7 +49,7 @@ describe("a toggle applied to a picker", function()
 
   it("keeps the arguments it did not come for", function()
     local it_is = picker()
-    search.toggle(it_is, "fixed_strings")
+    search.toggle(it_is, "ignore_case")
     assert.is_true(vim.tbl_contains(it_is.opts.args, "--glob=!*.md"))
   end)
 
@@ -64,8 +64,8 @@ describe("a toggle applied to a picker", function()
     search.toggle(it_is, "ignore_case")
     assert.equal("Grep (code, any case)", it_is.title)
 
-    search.toggle(it_is, "fixed_strings")
-    assert.equal("Grep (code, any case, literal)", it_is.title)
+    search.toggle(it_is, "ignore_case")
+    assert.equal("Grep (code)", it_is.title)
   end)
 
   it("refuses a toggle that does not exist, rather than doing nothing", function()

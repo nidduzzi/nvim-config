@@ -108,8 +108,15 @@ end
 
 --- Ways the same search can be run again, each one ripgrep flag.
 ---
+--- One entry so far. It is a list rather than a function because the key, the
+--- flag, the word the title gains and the message all belong to one another,
+--- and `lua/plugins/picker.lua` builds the keymap and the action from it.
+---
 --- In order, because the title is built from the ones that are on and a title
 --- that reorders itself between searches is a title nobody can read.
+---
+--- snacks binds `<a-r>` to its own regex toggle and `<a-p>` to its preview,
+--- so a new entry here has to check the defaults before it takes a key.
 ---@type { name: string, key: string, desc: string, flag: string, label: string, on: string, off: string }[]
 M.toggles = {
   {
@@ -120,15 +127,6 @@ M.toggles = {
     label = "any case",
     on = "Ignoring case.",
     off = "Case matters again (smart-case).",
-  },
-  {
-    name = "fixed_strings",
-    key = "<a-r>",
-    desc = "Match literally, not as a regular expression",
-    flag = "--fixed-strings",
-    label = "literal",
-    on = "Matching literally.",
-    off = "Matching as a regular expression again.",
   },
 }
 
@@ -513,9 +511,7 @@ end
 --- ripgrep is given --smart-case, so a lowercase query already ignores case
 --- and any capital makes it exact. That is the right default and the wrong one
 --- exactly when you typed a capital and meant a name: searching `Project` will
---- not find `project`. Likewise a query full of dots and brackets is usually a
---- string rather than a pattern. Both are answered by running the same search
---- again with one more flag.
+--- not find `project`. This forces the insensitive read without retyping.
 ---@param picker table
 ---@param name string
 function M.toggle(picker, name)
