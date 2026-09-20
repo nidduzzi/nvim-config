@@ -628,3 +628,23 @@ Reading it at the moment the decision is made covers every panel, including
 the ones nobody thought to name. Verified by opening Lazy, checkhealth,
 Trouble, the quickfix list and help in one session: no warnings. A Rust file
 with no server still warns.
+
+---
+
+## 31. The dismiss key closes the diff view too
+
+**Decided:** a rung between the floats and the panels closes a Diffview tab
+with `:DiffviewClose`.
+
+**Against:** leaving it, since every other overlay was covered.
+
+**On:** `<c-c>` is documented here as the key that closes whatever is open,
+and the configuration's own merge-conflict view was the exception: pressing it
+in a Diffview tab did nothing at all. The panel rung could not do it either —
+Diffview owns the whole tab, and closing one of its windows leaves the tab,
+the panel and the files exactly where they were.
+
+Found by driving combinations rather than features: open a thing, open
+another thing over it, press the key, and see what is left. The same pass
+confirmed the ladder is right for a picker over Trouble — picker, then
+Trouble, then nothing, and the file underneath is never closed.
