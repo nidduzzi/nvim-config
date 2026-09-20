@@ -236,11 +236,15 @@ function M.safe_exepath(name, start)
     return ""
   end
   -- Resolved for the same reason the root is: a symlinked program inside the
-  -- project is inside the project, whatever its path says.
-  found = vim.uv.fs_realpath(found) or found
+  -- project is inside the project, whatever its path says. Only the decision
+  -- is made on the resolved path. What comes back is the name PATH gave,
+  -- because a version manager's shim is a symlink to the manager itself:
+  -- resolving ~/.local/share/mise/shims/julia hands back /usr/bin/mise, and
+  -- running that with Julia's arguments exits 2 before the adapter speaks.
+  local resolved = vim.uv.fs_realpath(found) or found
 
   local root = M.root(start or vim.fn.getcwd())
-  local inside = vim.fs.relpath(root, found)
+  local inside = vim.fs.relpath(root, resolved)
   if inside and not inside:match("^%.%.") and not may_run_project_bin(root) then
     say_refused(root, found)
     return ""
