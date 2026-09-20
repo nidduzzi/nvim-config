@@ -901,3 +901,38 @@ This is a side effect on PATH, and the only one in this configuration. It
 changes what `python3` means for every process the editor starts, which is the
 point --- Mason is not the only thing that wants a virtualenv --- and it
 happens only when the one on PATH cannot do the job.
+
+---
+
+## 41. A component is debugged in a browser
+
+**Decided:** TypeScript, TSX, JavaScript and JSX get two more configurations:
+open a browser on this project's dev server, and attach to one already
+running with `--remote-debugging-port=9222`.
+
+**Against:** leaving TSX with only "Run this file", which cannot work: Node
+strips types but does not understand JSX, so a component never runs as a
+file.
+
+**On:** a `.tsx` is compiled by the dev server into JavaScript with a source
+map, the browser runs that, and the debugger attaches to the browser and maps
+the stop back through the map. That is what VS Code does with `pwa-chrome`,
+and the adapter is already here --- what was missing were the configurations
+and the two things that make a breakpoint land in your file rather than in
+something the bundler invented: `webRoot` and `sourceMapPathOverrides`.
+
+The URL is derived. A port written into a `package.json` script wins, because
+somebody wrote it down on purpose; otherwise the framework's own default,
+keyed on the config file that says which framework it is --- 5173 for Vite and
+SvelteKit, 3000 for Next and Remix, 4200 for Angular, 4321 for Astro.
+
+Verified end to end, not by reading: a page served on 4321, an `app.js` with a
+source map naming `app.tsx`, headless Chrome from the playwright cache, a
+breakpoint set on line 2 of the `.tsx`. The session started and stopped there,
+in `app.tsx`.
+
+Worth recording how the first attempt failed. The new function was defined
+below the one that called it, which Lua only notices when the call runs:
+`check-syntax.sh` passed, and the editor reported `Failed to run 'config' for
+nvim-dap`. The configurations silently fell back to LazyVim's two. Driving it
+is what found that; compiling it never would have.

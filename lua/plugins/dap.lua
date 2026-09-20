@@ -220,6 +220,100 @@ local function node_strips_types()
   return minor >= NODE_STRIPS_TYPES[2]
 end
 
+-- Where a dev server listens, keyed on the file that says which one it is.
+-- The port is a decision the framework already made, and every one of these
+-- documents its own.
+local DEV_SERVER = {
+  ["vite.config.js"] = 5173,
+  ["vite.config.ts"] = 5173,
+  ["vite.config.mjs"] = 5173,
+  ["svelte.config.js"] = 5173,
+  ["astro.config.mjs"] = 4321,
+  ["next.config.js"] = 3000,
+  ["next.config.ts"] = 3000,
+  ["next.config.mjs"] = 3000,
+  ["remix.config.js"] = 3000,
+  ["angular.json"] = 4200,
+  ["nuxt.config.ts"] = 3000,
+}
+
+--- The port this project's dev server listens on.
+---
+--- A port written into a script wins over the framework's default, because
+--- somebody wrote it down on purpose. `--port 4000`, `-p 4000` and
+--- `--port=4000` are all in use, and all three mean the same thing.
+---@param root string
+---@return integer
+local function dev_server_port(root)
+  local package_json = vim.fs.joinpath(root, "package.json")
+  if vim.uv.fs_stat(package_json) then
+    local ok, manifest = pcall(vim.json.decode, table.concat(vim.fn.readfile(package_json), "\n"))
+    if ok and type(manifest) == "table" and type(manifest.scripts) == "table" then
+      for _, script in pairs(manifest.scripts) do
+        local port = type(script) == "string" and script:match("%-%-port[= ](%d+)") or nil
+        port = port or (type(script) == "string" and script:match("%-p%s+(%d+)") or nil)
+        if port then
+          return tonumber(port)
+        end
+      end
+    end
+  end
+
+  for marker, port in pairs(DEV_SERVER) do
+    if vim.uv.fs_stat(vim.fs.joinpath(root, marker)) then
+      return port
+    end
+  end
+
+  return 3000
+end
+
+--- Debugging a component means debugging a browser.
+---
+--- A .tsx file is never run: a dev server compiles it to JavaScript with a
+--- source map, the browser runs that, and the debugger attaches to the
+--- browser and maps what it stops on back through the source map. So the two
+--- useful configurations are "open a browser on the dev server" and "attach
+--- to the one already open", and both need the source map to be followed home
+--- --- webRoot is what turns a URL back into a file on disk.
+---@param root string
+---@return table[]
+local function browser_configurations(root)
+  local port = dev_server_port(root)
+  local url = ("http://localhost:%d"):format(port)
+
+  return {
+    {
+      type = "pwa-chrome",
+      request = "launch",
+      name = ("Open a browser on %s"):format(url),
+      url = url,
+      webRoot = root,
+      sourceMaps = true,
+      -- Where a bundler says a file came from, and where it actually is.
+      -- Without these a breakpoint set in the editor lands in a file the
+      -- browser invented.
+      sourceMapPathOverrides = {
+        ["webpack:///./~/*"] = vim.fs.joinpath(root, "node_modules", "*"),
+        ["webpack:///./*"] = vim.fs.joinpath(root, "*"),
+        ["webpack:///*"] = "*",
+        ["webpack://?:*/*"] = vim.fs.joinpath(root, "*"),
+        ["/./*"] = vim.fs.joinpath(root, "*"),
+        ["/src/*"] = vim.fs.joinpath(root, "src", "*"),
+      },
+      userDataDir = false,
+    },
+    {
+      type = "pwa-chrome",
+      request = "attach",
+      name = "Attach to a browser started with --remote-debugging-port=9222",
+      port = 9222,
+      webRoot = root,
+      sourceMaps = true,
+    },
+  }
+end
+
 --- TypeScript and TSX, launched with a runtime this machine has.
 ---
 --- LazyVim's own configuration names `tsx` or `ts-node` as the runtime for
@@ -249,7 +343,7 @@ local function javascript_configurations(root)
     end
   end
 
-  return { configuration }
+  return vim.list_extend({ configuration }, browser_configurations(root))
 end
 
 --- nvim-dap-python registers `file`, `file:args`, `attach` and `file:doctest`.
