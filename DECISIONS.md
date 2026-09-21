@@ -1877,3 +1877,20 @@ A genuinely dead key added to `lua/config/keymaps.lua` by hand
 describe nothing." Reverted immediately after -- `git status` clean, nothing
 left behind. Same purpose as entry 71: this gate had been read and trusted,
 never actually watched fail.
+
+---
+
+## 73. feature-tour.sh, verified both directions
+
+**Not a decision. Closes plan verification item 4, the gate the plan's own
+introduction named as the original example of the whole problem.**
+
+`startup`'s expected pattern edited to something no real dashboard would
+ever print, filtered to just that one scenario: real exit 1, named exactly
+--
+`startup: no /Neovim loaded XXX-sabotage-XXX/`. Reverted, `git status`
+clean, then run again unsabotaged to confirm the reversion itself did not
+leave anything broken: real exit 0, captured normally. Both directions
+proven, not assumed -- this is the exact gate the plan document opened
+with ("feature-tour.sh exits 0 even when scenarios fail"), fixed long
+before this round of verification but never actually watched fail since.
