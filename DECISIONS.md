@@ -1333,3 +1333,20 @@ Where each platform stands:
     Linux    seven, driven through the keys and the frame, plus the browser
     macOS    six, driven; the browser case is a Chrome that will not connect
     Windows  three, headless, because there is no tmux to drive
+
+---
+
+## 54. The nightly tour will not run until the stack merges
+
+**Yours, and it resolves itself the moment the branches land.**
+
+`harness.yml` now runs the whole feature tour on a schedule --- sixty editors
+started one after another, too slow for a push and the thing most worth
+knowing about a configuration that moves only when someone edits it. The
+contact sheet is kept either way, so a failure can be looked at rather than
+guessed at.
+
+GitHub runs scheduled workflows from the default branch only. This one lives
+on `audit-single-keys` until the stack is merged, so the schedule fires
+nothing until then. Nothing to fix; it is written down so that a tour nobody
+has seen running is not mistaken for a tour that passed.
