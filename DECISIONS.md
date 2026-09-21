@@ -1579,3 +1579,39 @@ bug class:
 All 23 `pipefail`-using scripts in `tools/nvim-harness` have now been swept
 for this pattern. Four real instances found and fixed across this session
 (`run-probes.sh` x2, plus the two above); none outstanding.
+
+## 62. Harpoon and yanky write real state outside anything this harness isolates
+
+**Not blocking, handled at the point it actually mattered. Worth knowing.**
+
+`nvim-drive.sh` and `film.sh` isolate `XDG_CONFIG_HOME` (which config loads)
+and, with `-I`, shada (cursor history, marks). Neither isolates
+`XDG_DATA_HOME`, and two plugins persist real, meaningful state there:
+harpoon's pinned-file list and yanky's yank-ring sqlite database. The first
+draft of `harpoon-list.keys`/`yank-ring.keys` proved it directly — the
+captured frame showed 45 yank-history entries and a fourth pinned file
+neither `.keys` file ever touched, real state left over from unrelated
+earlier runs on this machine.
+
+Fixed at the two call sites that render it on screen: both `.keys` files now
+open with `ex:lua require("harpoon"):list():clear()` /
+`ex:lua require("yanky.history").clear()` before acting, so the frame shows
+only what the test itself did. Checked every other committed `.expected`
+file for the same risk — `dashboard.expected` is the one that could plausibly
+show a real recent-files list, and it does not; the dashboard menu here is
+static labels, not a live list. Nothing else screen-tested touches a
+plugin whose whole feature is "remember something across runs."
+
+Left as a real, general gap rather than fixed at the driver level:
+`nvim-drive.sh`/`film.sh` isolating `XDG_DATA_HOME` wholesale would also
+isolate the installed `lazy`/`mason` directories, forcing every driven run to
+reinstall plugins and language servers rather than reusing what is already
+there — real cost for a problem that, checked directly above, does not
+currently reach any committed frame. Worth a proper fix (redirect the
+directory, symlink `lazy`/`mason` back in for speed) if a third
+persistent-state plugin becomes a screen test; not before.
+
+Also worth noting: this closes the plan's surface B. All twelve rendered
+flows it enumerated (dashboard, find-file, grep-ranking, capabilities,
+explorer, settings, the rung picker, hover, both dismiss paths, harpoon,
+yank-ring, diagnostics) now have a committed golden frame.
