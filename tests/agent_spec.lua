@@ -27,7 +27,38 @@ after_each(function()
 end)
 
 describe("switching backend", function()
-  it("switches to a real, installed backend named directly", function()
+  -- Whether the real CLIs are installed is a fact about this machine, not
+  -- about the logic under test, and CI runners have none of them: the first
+  -- version of this asked for "claude" directly and failed everywhere but
+  -- here. claude.cmd is pointed at a real, portable executable for the
+  -- length of this block instead, so resolve() has something genuine to
+  -- find regardless of what is actually installed.
+  local dir, path_before, cmd_before, proven_before
+
+  before_each(function()
+    dir = vim.fn.tempname()
+    vim.fn.mkdir(dir, "p")
+    path_before = vim.env.PATH
+
+    local windows = vim.fn.has("win32") == 1
+    local program = vim.fs.joinpath(dir, "spec-fake-backend" .. (windows and ".bat" or ""))
+    vim.fn.writefile(windows and { "@echo off", "exit /b 0" } or { "#!/bin/sh", "exit 0" }, program)
+    vim.fn.setfperm(program, "rwxr-xr-x")
+    vim.env.PATH = dir .. (windows and ";" or ":") .. path_before
+
+    cmd_before = backends.claude.cmd
+    proven_before = backends.claude.proven
+    backends.claude.cmd = vim.fs.basename(program)
+  end)
+
+  after_each(function()
+    vim.env.PATH = path_before
+    vim.fn.delete(dir, "rf")
+    backends.claude.cmd = cmd_before
+    backends.claude.proven = proven_before
+  end)
+
+  it("switches to a real, resolvable backend named directly", function()
     agent.use("claude")
     assert.are.same("claude", settings.get("agent_backend"))
     assert.are.equal(1, #notified)
@@ -42,8 +73,9 @@ describe("switching backend", function()
   end)
 
   it("does not switch to a known backend that is not on this machine's PATH", function()
-    -- codex is a real entry in backends.lua and genuinely not installed
-    -- here -- the case the "not on PATH" branch exists for, not a fake one.
+    -- codex is a real entry in backends.lua and genuinely not installed on
+    -- any machine this runs on -- the case the "not on PATH" branch exists
+    -- for, not a fake one.
     settings.set("agent_backend", "claude")
     agent.use("codex")
     assert.are.same("claude", settings.get("agent_backend"))
@@ -51,14 +83,8 @@ describe("switching backend", function()
   end)
 
   it("says plainly when the backend has not been shown to refuse a write", function()
-    -- Both real backends installed here are proven=true, since this session
-    -- ran their canary -- there is no naturally-unproven, naturally-installed
-    -- backend left to demonstrate this branch with, so hermes.proven is
-    -- flipped for the one call and put back.
-    backends.hermes.proven = false
-    agent.use("hermes")
-    backends.hermes.proven = true
-
+    backends.claude.proven = false
+    agent.use("claude")
     assert.is_truthy(notified[1].message:match("unproven"))
     assert.are.equal(vim.log.levels.WARN, notified[1].level)
   end)
@@ -77,8 +103,8 @@ describe("switching backend", function()
       on_choice(nil)
     end
     agent.use()
-    assert.is_truthy(vim.tbl_contains(offered, "claude"))
-    assert.is_falsy(vim.tbl_contains(offered, "codex"))
+    assert.is_truthy(vim.tbl_contains(offered, backends.claude.cmd))
+    assert.is_falsy(vim.tbl_contains(offered, backends.codex.cmd))
   end)
 end)
 
