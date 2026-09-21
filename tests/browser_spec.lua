@@ -26,6 +26,22 @@ local function make_executable(path)
   vim.fn.setfperm(path, "rwxr-xr-x")
 end
 
+--- Where from_playwright() looks for the program inside one build directory,
+--- on whichever real platform this runs on. A bare file named "chrome" with
+--- no extension is not a program Windows will call executable at all, so a
+--- build built the Linux shape everywhere else here is built found nothing
+--- there and made a test about sort order fail on a layout problem instead.
+---@return string[]
+local function chrome_relative()
+  if vim.fn.has("win32") == 1 then
+    return { "chrome-win", "chrome.exe" }
+  end
+  if vim.fn.has("mac") == 1 then
+    return { "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium" }
+  end
+  return { "chrome-linux64", "chrome" }
+end
+
 describe("playwright_cache", function()
   local before
 
@@ -112,9 +128,9 @@ describe("executable", function()
     -- Sorted as text, chromium-2000 reads before chromium-999; sorted as the
     -- number in the name, it does not. Three builds, out of numeric order on
     -- disk, so a directory listing cannot be the thing that decides it.
-    make_executable(vim.fs.joinpath(cache, "chromium-500", "chrome-linux64", "chrome"))
-    make_executable(vim.fs.joinpath(cache, "chromium-2000", "chrome-linux64", "chrome"))
-    make_executable(vim.fs.joinpath(cache, "chromium-999", "chrome-linux64", "chrome"))
+    for _, build in ipairs({ "chromium-500", "chromium-2000", "chromium-999" }) do
+      make_executable(vim.fs.joinpath(cache, build, unpack(chrome_relative())))
+    end
 
     local found = browser.executable()
     assert.is_truthy(found)
@@ -129,12 +145,7 @@ describe("executable", function()
     -- layout lookup this test is actually about.
     vim.env.PATH = dir
     local cache = vim.env.PLAYWRIGHT_BROWSERS_PATH
-    local windows = vim.fn.has("win32") == 1
-    local mac = vim.fn.has("mac") == 1
-    local relative = windows and { "chromium-1", "chrome-win", "chrome.exe" }
-      or mac and { "chromium-1", "chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium" }
-      or { "chromium-1", "chrome-linux64", "chrome" }
-    make_executable(vim.fs.joinpath(cache, unpack(relative)))
+    make_executable(vim.fs.joinpath(cache, "chromium-1", unpack(chrome_relative())))
 
     local found = browser.executable()
     assert.is_truthy(found)
