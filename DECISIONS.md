@@ -1799,3 +1799,27 @@ cases finish: find anything now parented to init whose command line names
 the same way entry 67's fix does, kill what is found. Verified against the
 real leak, filtered to tsx+julia specifically and then the full seven-
 language run: both stop where told, exit 0, nothing left over either time.
+
+---
+
+## 69. python flaked once, on debuggers-macos, unrelated to anything in flight
+
+**Not a decision. Worth watching, not yet worth acting on -- same call as
+entry 65.**
+
+The push-triggered run right after entry 68's fix failed `debuggers-macos`
+on python: debugpy answered ("Telemetry" for both ptvsd and debugpy), the
+editor listed real launch configurations for the file, and the session
+never stopped at the breakpoint. The pull-request run on the identical
+commit passed every debugger, python included. That fix only touched
+`check-debuggers-headless.sh`, which `debuggers-macos` does not run at all
+(it runs `check-debuggers.sh`, the tmux-driven one), so this is not a
+regression from it.
+
+python is one of the three languages this session has deliberately kept
+enforcing rather than given tsx's flaky treatment (entry 57), on the
+reasoning that it does not depend on a second live process the way a real
+browser does. One occurrence, contradicted by the parallel run on the same
+commit, is not the recurring rate that justified that treatment for tsx --
+so left enforcing, logged rather than acted on, same call as entry 65's
+hover flake. Worth a look if it recurs.
