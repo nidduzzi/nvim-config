@@ -1864,3 +1864,16 @@ gate: it was read after `| tail -15`, so it was `tail`'s exit status, not
 this time in a throwaway one-line test rather than in committed code.
 Redone without the pipe: exit 1, for real. The gate has always set `status=1`
 and exited it correctly; it had just never been proven to fail before.
+
+---
+
+## 72. check-keymaps.sh's dead-key gate, verified the same way
+
+**Not a decision. Closes plan verification item 5, for real this time.**
+
+A genuinely dead key added to `lua/config/keymaps.lua` by hand
+(`<leader>zZ` bound to `<Nop>`, described but doing nothing): real exit 1,
+`check-keymaps.sh` named it directly under "dead keys and keys that
+describe nothing." Reverted immediately after -- `git status` clean, nothing
+left behind. Same purpose as entry 71: this gate had been read and trusted,
+never actually watched fail.
