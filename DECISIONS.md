@@ -1453,6 +1453,10 @@ What is not fixed, and may not be fixable from here: whatever makes a real
 Chrome under CI load occasionally drop the DAP connection after a correct
 handshake. Nothing left to read blind for it --- the log is real now, the
 timeouts are generous, and the remaining failure is a live browser under
-contended CI hardware being a live browser under contended CI hardware. Left
-enforcing rather than reported, because it passes most of the time and a
-flake that fails one run in four is still worth seeing.
+contended CI hardware being a live browser under contended CI hardware.
+
+**Update:** it was closer to one run in three across the next few pushes,
+not one in four, which is too often to keep gating a job on. python,
+typescript and rust --- the three that do not depend on a second live
+process --- keep enforcing; tsx now reports without failing the job. Still
+worth seeing when it fails, so it still prints.
