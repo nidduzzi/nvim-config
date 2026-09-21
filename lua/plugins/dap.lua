@@ -630,6 +630,11 @@ return {
               host = "127.0.0.1",
               port = port,
               executable = { command = node, args = server_args },
+              -- nvim-dap gives up after fourteen tries a quarter of a second
+              -- apart. Node starting cold on Windows takes longer than that,
+              -- and what the editor reports is ECONNREFUSED -- which reads as
+              -- an adapter that was never installed.
+              options = { max_retries = 80 },
             })
             return
           end
