@@ -1343,7 +1343,12 @@ Where each platform stands:
 
     Linux    seven, driven through the keys and the frame, browser included
     macOS    six, driven, browser included; julia is not installed there
-    Windows  three, headless, because there is no tmux to drive
+    Windows  four, headless, browser included; there is no tmux to drive
+
+The headless path serves the page and starts the browser itself, which is a
+few lines rather than a terminal --- so the case Windows had no way to check
+at all is checked there, in a real Chrome, stopping at `index.tsx:9` through
+the source map.
 
 ---
 
