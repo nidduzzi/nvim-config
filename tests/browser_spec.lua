@@ -49,7 +49,7 @@ describe("playwright_cache", function()
 end)
 
 describe("executable", function()
-  local dir, path_before, playwright_before
+  local dir, path_before, playwright_before, installed_before
 
   before_each(function()
     dir = vim.fn.tempname()
@@ -57,13 +57,19 @@ describe("executable", function()
     path_before = vim.env.PATH
     playwright_before = vim.env.PLAYWRIGHT_BROWSERS_PATH
     -- Neither real place this machine might actually have a browser should
-    -- leak into what these tests see.
+    -- leak into what these tests see: the CI runners this also has to pass
+    -- on genuinely have one each, ubuntu-latest on PATH and macos-latest
+    -- and windows-latest as a real installed application, which is a third
+    -- lookup entirely and not something clearing PATH touches at all.
     vim.env.PLAYWRIGHT_BROWSERS_PATH = vim.fs.joinpath(dir, "no-playwright-here")
+    installed_before = { mac = browser.installed.mac, win32 = browser.installed.win32 }
+    browser.installed = { mac = {}, win32 = {} }
   end)
 
   after_each(function()
     vim.env.PATH = path_before
     vim.env.PLAYWRIGHT_BROWSERS_PATH = playwright_before
+    browser.installed = installed_before
     vim.fn.delete(dir, "rf")
   end)
 
