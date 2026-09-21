@@ -1299,3 +1299,22 @@ for where Windows does not keep it.
 The Windows job reports rather than enforces until this is understood. The
 alternative --- a red tick on every push saying the same thing --- is a tick
 nobody reads.
+
+**Since then: Python debugs on Windows.** Five defects came out of chasing it,
+every one of them real and none of them visible without asking the editor what
+it had been told:
+
+    the venv had no debugpy      python -m debugpy.adapter exits 1, silently
+    mason had not loaded         its bin directory is only on PATH once it has
+    the shim is a .CMD           a script, not something libuv can spawn
+    the adapters were overwritten LazyVim's extra writes them after this runs
+    ${port} was never substituted the editor dialled a port called ${port}
+
+The adapters are started from the programs inside mason's packages now ---
+debugpy's own interpreter, and the server js-debug ships run by node --- which
+is a real program on every platform.
+
+TypeScript on Windows is still out: the port is chosen here and the server is
+started, and the editor gets ECONNREFUSED against it for twenty seconds. At
+TRACE level nvim-dap logs nothing about the process at all, which is the next
+thing to find out --- whether it was started and died, or never started.
