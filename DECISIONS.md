@@ -1396,7 +1396,7 @@ why the debuggers are checked there by asking nvim-dap directly instead.
 
 ## 56. Codex is one credential away from being verified
 
-**Needs you: nothing here can proceed without your own OpenAI login.**
+**Closed. You have no OpenAI subscription, so this stays proven = false.**
 
 `M.codex` in `lua/util/agent/backends.lua` is `proven = false` --- written from
 the documentation, run against nothing, because codex was never installed on
@@ -1410,9 +1410,8 @@ afterward. What stops the canary is exactly one thing: no `OPENAI_API_KEY` and
 no `codex login` session on this machine, and getting either of those is not
 something to do without you --- it is your account.
 
-To close this, either run `codex login` once on a machine that has this
-config, or set `OPENAI_API_KEY` where the harness runs and re-run
-`agent-canary.sh` pointed at codex. Nothing else about the backend needs
-touching first: the git-repo-trust check codex does on its own passed as soon
-as it was run inside a git repository, and the 401 is the only thing standing
-between `proven = false` and a real answer.
+You said plainly: no OpenAI subscription. That ends this one -- not a
+credential to gather later, a backend nobody here can pay to verify. `codex`
+stays in `backends.lua` as documentation-only, `proven = false`, and the
+canary is not run against it. If that changes, the path back is exactly what
+is written above: `codex login` or `OPENAI_API_KEY`, nothing else.
