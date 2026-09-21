@@ -84,7 +84,11 @@ describe("executable", function()
   end)
 
   it("picks the newest Playwright build by number, not by name order", function()
-    vim.env.PATH = path_before -- nothing of ours on PATH
+    -- Not path_before: the ubuntu-latest runner this also has to pass on
+    -- genuinely ships /usr/bin/google-chrome, and a PATH that still reaches
+    -- it finds that ahead of anything Playwright has, real chrome winning
+    -- for the wrong reason on the one machine that already has one.
+    vim.env.PATH = dir
     local cache = vim.env.PLAYWRIGHT_BROWSERS_PATH
 
     -- Sorted as text, chromium-2000 reads before chromium-999; sorted as the
@@ -100,7 +104,12 @@ describe("executable", function()
   end)
 
   it("looks inside the platform's own chrome layout for the build it finds", function()
-    vim.env.PATH = path_before
+    -- Not path_before, and the found path is checked against the cache
+    -- directory rather than just asserted truthy, for the same reason as
+    -- the two tests above: a merely-truthy check passed here even while
+    -- PATH still reached a real system browser, proving nothing about the
+    -- layout lookup this test is actually about.
+    vim.env.PATH = dir
     local cache = vim.env.PLAYWRIGHT_BROWSERS_PATH
     local windows = vim.fn.has("win32") == 1
     local mac = vim.fn.has("mac") == 1
@@ -109,11 +118,16 @@ describe("executable", function()
       or { "chromium-1", "chrome-linux64", "chrome" }
     make_executable(vim.fs.joinpath(cache, unpack(relative)))
 
-    assert.is_truthy(browser.executable())
+    local found = browser.executable()
+    assert.is_truthy(found)
+    assert.is_truthy(found:find(cache, 1, true))
   end)
 
   it("is nil rather than an error when nothing anywhere has a browser", function()
-    vim.env.PATH = path_before
+    -- Same reason as the build-ordering test above: path_before still
+    -- reaches whatever this machine really has installed, and CI's own
+    -- ubuntu-latest runner really has one.
+    vim.env.PATH = dir
     assert.is_nil(browser.executable())
   end)
 end)
