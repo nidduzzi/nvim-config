@@ -1415,3 +1415,44 @@ credential to gather later, a backend nobody here can pay to verify. `codex`
 stays in `backends.lua` as documentation-only, `proven = false`, and the
 canary is not run against it. If that changes, the path back is exactly what
 is written above: `codex login` or `OPENAI_API_KEY`, nothing else.
+
+---
+
+## 57. Two real bugs in the diagnostic itself, and one real flake left under it
+
+**Not yours. Written down so the next investigation starts past this point
+instead of at it.**
+
+`lsp-parity.lua` had never asked a language server anything, on any run,
+against any project, this whole session: `run-probes.sh` drove it with no
+file open, so `vim.lsp.get_clients()` on the dashboard buffer was always
+empty and the report was one line, `cursor: {...}`. Fixing that exposed a
+second bug behind it --- `--include` placed after `--` in the `grep` that
+finds a file containing the symbol, read as eight literal filenames instead
+of eight flags, failing with exit 2 and no output. Both fixed; verified
+against the fixture (20 real requests answered by lua_ls) and against a
+5417-file real project (correctly reports no python server installed here).
+Wired into CI, where it had never run either.
+
+Chasing a Windows CI flake on the browser debugger found the same shape of
+bug in `debug-headless.lua`: it read `dap.log` from `stdpath("cache")`, and
+nvim-dap writes it through `stdpath("log")` (an alias for `stdpath("state")`
+on current Neovim). Every "the adapter logged nothing" this script ever
+printed, on every platform, was reading an empty directory --- not reporting
+an empty log.
+
+With that fixed, the real trace showed two genuine timeouts under it:
+`initialize_timeout_sec` (default 4s) firing before a cold node + a real
+browser launch on Windows finished the DAP handshake, and 40s of settle
+being too little for the same reason. Both raised. The browser case now gets
+through further each time --- `configurationDone` succeeds, telemetry sends
+--- and still occasionally disconnects before the breakpoint, on Windows
+only, intermittently: three of the last four Windows runs passed.
+
+What is not fixed, and may not be fixable from here: whatever makes a real
+Chrome under CI load occasionally drop the DAP connection after a correct
+handshake. Nothing left to read blind for it --- the log is real now, the
+timeouts are generous, and the remaining failure is a live browser under
+contended CI hardware being a live browser under contended CI hardware. Left
+enforcing rather than reported, because it passes most of the time and a
+flake that fails one run in four is still worth seeing.
