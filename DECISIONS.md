@@ -1615,3 +1615,23 @@ Also worth noting: this closes the plan's surface B. All twelve rendered
 flows it enumerated (dashboard, find-file, grep-ranking, capabilities,
 explorer, settings, the rung picker, hover, both dismiss paths, harpoon,
 yank-ring, diagnostics) now have a committed golden frame.
+
+## 63. The stress tour is recorded and published
+
+**Not a decision. Closes the plan's last open item.**
+
+`record-stress-tour.sh` against `label-studio` (5,611 tracked files),
+`crun` (277) and `migml` (736): six real flows (grep ranking, file finding,
+the capability picker in a large project, the same grep in a C project, a
+docs-heavy project's filter cycling, `:checkhealth dotfiles`), plus probe
+timings on all three projects. Every probe stayed under `run-probes.sh`'s
+500ms budget; nothing reported a startup error.
+
+A recording existed from two days earlier but predated today's fixes to
+`record-stress-tour.sh` itself (entry 61) and was never built into a page,
+so it was replaced rather than reused. Built with `build-tour.py` and
+published: https://claude.ai/artifact/PMMjt3WddNQp1ymEwboToq
+
+Together with entry 62, the plan in `vectorized-popping-summit.md` is now
+complete end to end: the shell gates, the unit specs, the golden frames, and
+the recorded, published tour.
