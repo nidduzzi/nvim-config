@@ -1319,6 +1319,17 @@ port to listen on and not which address, so it took whatever `localhost`
 resolves to --- ::1 first on Windows --- while the editor dialled 127.0.0.1.
 A refused connection against a server that had started perfectly well.
 
-The job enforces rather than reports now. What found each of these was the
-same thing every time: making the check say what the editor had been told,
-rather than reasoning about what it should have been.
+Rust debugs there as well --- the runner's toolchain and codelldb's Windows
+build agree about a program built on that machine --- so the job checks
+python, typescript and rust and enforces rather than reports.
+
+What found each of these was the same thing every time: making the check say
+what the editor had been told, rather than reasoning about what it should have
+been. The decisive step was starting the debug server by hand in CI, with no
+editor in the picture, which ruled out node and the package in one run.
+
+Where each platform stands:
+
+    Linux    seven, driven through the keys and the frame, plus the browser
+    macOS    six, driven; the browser case is a Chrome that will not connect
+    Windows  three, headless, because there is no tmux to drive
