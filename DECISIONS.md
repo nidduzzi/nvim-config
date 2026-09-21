@@ -1635,3 +1635,36 @@ published: https://claude.ai/artifact/PMMjt3WddNQp1ymEwboToq
 Together with entry 62, the plan in `vectorized-popping-summit.md` is now
 complete end to end: the shell gates, the unit specs, the golden frames, and
 the recorded, published tour.
+
+---
+
+## 64. Orphaned Neovim processes, found while the stress tour recorded
+
+**Not a decision. Real resource leak, fixed.**
+
+Three real Neovim processes were found alive at a process listing, hours
+after the harness runs that started them: reparented to init, each still
+holding the RPC socket (`--listen /tmp/nvim-drive-*.sock -i NONE`) of a run
+whose tmux server and socket file were both long gone. `nvim-drive.sh`'s and
+`film.sh`'s cleanup only ever asked tmux to kill its server -- which sends
+SIGHUP to the pane, and Neovim does not reliably go down with it, headless
+or not.
+
+Fixed in both scripts: right after the tmux server is killed, a process
+match against this run's own RPC socket path takes down anything left
+listening on it. The path is unique per process
+(`nvim-drive-$$.sock` / `nvim-film-$$.sock`), so the match can only ever
+land on the one Neovim this run itself started -- guarded against an unset
+`$RPC` matching everything, the same shape as the existing socket-file
+removal's guard. Verified: killed the three real orphans by hand, confirmed
+a single driven run leaves nothing behind, then ran the full local screen
+suite (13 real driven runs) and confirmed a process listing shows nothing
+afterward.
+
+Worth a line for the record given this session's security scope (arbitrary
+execution / secrets that may leak): every orphan found was inert, holding
+only its own RPC socket with nothing connected to it, not attached to a
+terminal, not running anything -- a resource leak, not an execution or data
+exposure. Logged here because "careful with memory/storage, cleanup
+enforced" is explicit standing instruction, not because anything was found
+running that should not have been.
