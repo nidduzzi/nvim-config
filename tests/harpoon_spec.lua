@@ -100,9 +100,11 @@ describe("pinned files, with harpoon installed", function()
     fake_harpoon({ { value = "one.lua", context = { row = 5 } } })
 
     local picked
-    _G.Snacks = { picker = { pick = function(opts)
-      picked = opts
-    end } }
+    _G.Snacks = { picker = {
+      pick = function(opts)
+        picked = opts
+      end,
+    } }
     harpoon_picker.pick()
 
     assert.are.same({ 5, 0 }, picked.items[1].pos)
