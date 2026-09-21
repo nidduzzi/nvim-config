@@ -1271,7 +1271,7 @@ hand. The gap is here rather than hidden behind a green tick.
 
 ## 53. Windows: the adapters are there, and the sessions die silently
 
-**Needs your call eventually. Not blocking anything today.**
+**Settled. Nothing needed from you.**
 
 Windows has no tmux, so the driven check cannot run there at all. A headless
 one now can --- `check-debuggers-headless.sh` asks nvim-dap directly, start
@@ -1314,7 +1314,11 @@ The adapters are started from the programs inside mason's packages now ---
 debugpy's own interpreter, and the server js-debug ships run by node --- which
 is a real program on every platform.
 
-TypeScript on Windows is still out: the port is chosen here and the server is
-started, and the editor gets ECONNREFUSED against it for twenty seconds. At
-TRACE level nvim-dap logs nothing about the process at all, which is the next
-thing to find out --- whether it was started and died, or never started.
+TypeScript debugs on Windows too, after a sixth: the server was told which
+port to listen on and not which address, so it took whatever `localhost`
+resolves to --- ::1 first on Windows --- while the editor dialled 127.0.0.1.
+A refused connection against a server that had started perfectly well.
+
+The job enforces rather than reports now. What found each of these was the
+same thing every time: making the check say what the editor had been told,
+rather than reasoning about what it should have been.
