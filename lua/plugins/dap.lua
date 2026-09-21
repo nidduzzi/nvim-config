@@ -137,8 +137,11 @@ local function mason_js_debug()
   if not server or vim.fn.executable("node") ~= 1 then
     return nil, {}, 0
   end
+  -- The host is given as well as the port: left to itself the server listens
+  -- on whatever `localhost` resolves to, which on Windows is ::1 first, and
+  -- the editor dials 127.0.0.1.
   local port = free_port()
-  return vim.fn.exepath("node"), { server, tostring(port) }, port
+  return vim.fn.exepath("node"), { server, tostring(port), "127.0.0.1" }, port
 end
 
 ---@param root string
