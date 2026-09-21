@@ -87,6 +87,42 @@ local function from_mason(name)
   end
 end
 
+--- What a mason package actually runs, rather than the shim in front of it.
+---
+--- mason's Windows entry points are .CMD scripts. Started through cmd.exe they
+--- exist but do not speak: an executable adapter never answers on its pipes
+--- and a server adapter never listens. The program inside the package is a
+--- real program on every platform, so that is what gets started.
+---@param package string
+---@param relative string[] path inside the package, per platform
+---@return string|nil
+local function mason_payload(package, relative)
+  local path = vim.fs.joinpath(vim.fn.stdpath("data") --[[@as string]], "mason", "packages", package, unpack(relative))
+  if vim.uv.fs_stat(path) then
+    return path
+  end
+end
+
+--- The interpreter mason installed debugpy into.
+---@return string|nil command
+---@return string[] args
+local function mason_debugpy()
+  local windows = vim.fn.has("win32") == 1
+  local inside = windows and { "venv", "Scripts", "python.exe" } or { "venv", "bin", "python" }
+  return mason_payload("debugpy", inside), { "-m", "debugpy.adapter" }
+end
+
+--- The server js-debug ships, and the node that runs it.
+---@return string|nil command
+---@return string[] args
+local function mason_js_debug()
+  local server = mason_payload("js-debug-adapter", { "js-debug", "src", "dapDebugServer.js" })
+  if not server or vim.fn.executable("node") ~= 1 then
+    return nil, {}
+  end
+  return vim.fn.exepath("node"), { server, "${port}" }
+end
+
 ---@param root string
 ---@param name string
 ---@return string|nil path
@@ -468,6 +504,17 @@ return {
           return
         end
 
+        local interpreter, interpreter_args = mason_debugpy()
+        if interpreter then
+          callback({
+            type = "executable",
+            command = interpreter,
+            args = interpreter_args,
+            options = { source_filetype = "python" },
+          })
+          return
+        end
+
         local adapter = vim.fn.executable("debugpy-adapter") == 1 and vim.fn.exepath("debugpy-adapter") or from_mason("debugpy-adapter")
         if adapter then
           local program, arguments = spawnable(adapter)
@@ -558,6 +605,17 @@ return {
       -- loaded and the program can be found.
       for _, name in ipairs({ "pwa-node", "pwa-chrome" }) do
         dap.adapters[name] = function(callback)
+          local node, server_args = mason_js_debug()
+          if node then
+            callback({
+              type = "server",
+              host = "127.0.0.1",
+              port = "${port}",
+              executable = { command = node, args = server_args },
+            })
+            return
+          end
+
           local found = vim.fn.exepath("js-debug-adapter")
           if found == "" then
             found = from_mason("js-debug-adapter") or ""
