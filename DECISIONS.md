@@ -1894,3 +1894,27 @@ leave anything broken: real exit 0, captured normally. Both directions
 proven, not assumed -- this is the exact gate the plan document opened
 with ("feature-tour.sh exits 0 even when scenarios fail"), fixed long
 before this round of verification but never actually watched fail since.
+
+---
+
+## 74. lua/plugins/dap.lua has no unit tests, and that is the right call
+
+**Not a decision. Accepted, not a gap -- written down so it reads as a
+judgement rather than an oversight.**
+
+`spawnable()`, `anywhere()`, `free_port()`, `mason_payload()` and the rest --
+21 local functions, the exact logic this session's own fixes touched most
+(mise shims, `.CMD` spawning through `cmd.exe`, port allocation, cross-
+platform browser discovery) -- have zero unit coverage, unlike everything
+under `lua/util/`.
+
+Not an oversight: they are locals inside the plugin's own `opts = function()`
+closure, not a returned module table, so nothing outside this file can
+`require()` and call them at all. Making them testable would mean pulling
+them into a `util.dap_helpers` module purely so a unit test has something to
+call -- a real refactor of a file that is currently stable, CI-green, and
+already has the strongest verification this kind of logic can get: entries
+66 and 71-73 this session alone proved, for real, that all seven configured
+debuggers start their real adapter and stop at a real breakpoint, on
+ubuntu, macOS and Windows. A unit test of `free_port()` in isolation would
+prove less than that already does. Left alone, same call as `panel.lua`.
