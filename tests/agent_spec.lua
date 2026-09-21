@@ -174,3 +174,62 @@ describe("what this session has cost", function()
     assert.is_truthy(notified[1].message:match("last call: none yet"))
   end)
 end)
+
+describe("cancelling", function()
+  it("says plainly when nothing is running, rather than erroring", function()
+    assert.is_false(agent.is_running())
+    agent.cancel()
+    assert.is_truthy(notified[1].message:match("Nothing running"))
+  end)
+end)
+
+describe("starting a new conversation", function()
+  -- session_file() is private to util/agent/init.lua, with no accessor of
+  -- its own -- the file it names is reconstructed here from the same public
+  -- pieces the module builds it from (M.config.backend, the project root,
+  -- vim.fn.stdpath("state")), the only way to prove reset() actually removes
+  -- the right file rather than trusting that it does.
+  local root, cwd_before
+
+  before_each(function()
+    settings.set("agent_backend", "claude")
+    root = vim.fn.tempname()
+    vim.fn.mkdir(root, "p")
+    cwd_before = vim.uv.cwd()
+    vim.cmd.cd(root)
+  end)
+
+  after_each(function()
+    vim.cmd.cd(cwd_before)
+    vim.fn.delete(root, "rf")
+  end)
+
+  ---@return string
+  local function session_path()
+    local resolved = agent.root()
+    local dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "nvim-agent")
+    vim.fn.mkdir(dir, "p")
+    return vim.fs.joinpath(dir, ("%s-%s"):format(settings.get("agent_backend"), vim.fn.sha256(resolved):sub(1, 16)))
+  end
+
+  it("removes the remembered conversation for this project", function()
+    local path = session_path()
+    vim.fn.writefile({ "a-real-session-id" }, path)
+    assert.are.equal(1, vim.fn.filereadable(path))
+
+    agent.reset()
+
+    assert.are.equal(0, vim.fn.filereadable(path))
+    assert.is_truthy(notified[1].message:match("^Starting a new conversation for"))
+  end)
+
+  it("says so even when there was nothing to forget", function()
+    local path = session_path()
+    vim.fn.delete(path)
+
+    agent.reset()
+
+    assert.are.equal(0, vim.fn.filereadable(path))
+    assert.is_truthy(notified[1].message:match("^Starting a new conversation for"))
+  end)
+end)
