@@ -1774,3 +1774,28 @@ in a script the change never should have touched the exit code of.
 Rewritten as a proper `if`. Verified: all seven debuggers still stop where
 told, the full local screen suite (13 driven runs) still passes, and a
 process listing shows nothing left over after either.
+
+---
+
+## 68. The same leak, in the other debugger script
+
+**Not a decision. Closes entry 67 out properly -- it only covered half the
+harness.**
+
+`check-debuggers.sh` (tmux-driven) got the fix in entry 67. Its counterpart,
+`check-debuggers-headless.sh`, spawns Neovim directly, with no tmux pane to
+walk -- and has the identical leak for the identical reason: a graceful
+`qa!`/`cq!` never runs nvim-dap's session-close cleanup, since that hook is
+scoped to the DAP session closing, not to Neovim quitting. This is the
+script Windows and the ubuntu `gates` job actually run, so both were
+accumulating a julia process or a full Chrome tree per tsx/julia case,
+inside the one CI run that ran them -- not visible the way the dev-machine
+leak was (each job is a fresh runner, thrown away after), but real
+resource pressure on whatever ran later in that same job.
+
+Fixed with a single sweep in the script's own EXIT trap, run once after all
+cases finish: find anything now parented to init whose command line names
+`DebugAdapter.DebugSession` or `dapDebugServer.js`, walk its descendant tree
+the same way entry 67's fix does, kill what is found. Verified against the
+real leak, filtered to tsx+julia specifically and then the full seven-
+language run: both stop where told, exit 0, nothing left over either time.
