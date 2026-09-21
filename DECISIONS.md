@@ -1823,3 +1823,28 @@ browser does. One occurrence, contradicted by the parallel run on the same
 commit, is not the recurring rate that justified that treatment for tsx --
 so left enforcing, logged rather than acted on, same call as entry 65's
 hover flake. Worth a look if it recurs.
+
+---
+
+## 70. Not every named directory under ~/Documents/projects is a clone
+
+**Not a decision. A caution for whoever runs a probe against a new project
+next.**
+
+Went looking for a fourth real project to stress-probe, beyond the three
+this session's tour already used (`label-studio`, `crun`, `migml`).
+`~/Documents/projects/forgejo` reported `tracked_files 0`, `files_on_disk
+18` -- nothing like the real forgejo. `ls` showed why: it holds candidate
+onboarding CSVs and a message log, not a forgejo checkout, just a directory
+that happens to share the name. `keycloak` (1 tracked file), `wordpress` (0)
+and `temporal` (15) are the same shape -- near-empty, not the real project.
+
+Stopped there rather than probing further names blind: this session's
+security scope is explicitly about secrets and untrusted execution, and a
+directory that turns out to hold someone's personal data is exactly the
+kind of thing worth not running an unfamiliar tool against without knowing
+that first. The probe output itself was harmless (file counts and keymap
+timings, nothing from the files' content), and was deleted rather than
+kept. `jupyter` (87 tracked files) is real but small; nothing else checked
+turned out to be a substantial clone. The three already in the stress tour
+remain the right set for this kind of test on this machine.
