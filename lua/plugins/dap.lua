@@ -639,6 +639,19 @@ return {
             return
           end
 
+          -- Said out loud, because the two ways of starting this adapter fail
+          -- differently and the second one fails quietly: the shim is a .CMD
+          -- on Windows, and a session that dies on it reports a refused
+          -- connection rather than a program that would not run.
+          vim.notify(
+            ("js-debug: no server for node (node %s, server %s)"):format(
+              vim.fn.executable("node") == 1 and "found" or "missing",
+              mason_payload("js-debug-adapter", { "js-debug", "src", "dapDebugServer.js" }) or "missing"
+            ),
+            vim.log.levels.WARN,
+            { title = "Debugger" }
+          )
+
           local found = vim.fn.exepath("js-debug-adapter")
           if found == "" then
             found = from_mason("js-debug-adapter") or ""
