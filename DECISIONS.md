@@ -1706,3 +1706,71 @@ browser-dependent case, and hover is core editor behaviour with no second
 live process to blame. If it recurs, the fix is probably watching for a
 resolved signature specifically (retry until the type annotations appear, not
 just until any hover appears) rather than more attempts of the same kind.
+
+---
+
+## 66. Julia verified working, for the first time this session
+
+**Not a decision. Closes a gap in the original requirement.**
+
+"Debuggers for Python, Rust, TypeScript, TSX, C, C++, Julia" is the standing
+requirement, and Julia had been "skipped, no julia on PATH or in mason"
+every single run this whole session -- never once actually verified,
+despite the config carrying a full `dap.adapters.julia` (fixture, mise.toml
+pinning 1.11.9, `DebugAdapter.jl` already installed into it).
+
+The gap was environmental, not a config bug: mise here is activate-based
+(`mise activate` in shell rc, `shims_on_path: no`), and this Bash tool's own
+environment does not source that rc, so `julia` was never actually on its
+PATH regardless of what a real interactive shell -- or CI with mise properly
+set up -- would see. Confirmed by putting mise's shim directory on PATH by
+hand: `check-debuggers.sh -f julia` stops at `main.jl:2` like every other
+language. All seven required languages are now confirmed working on this
+machine, at least once, for real.
+
+CI does not install Julia and is not expected to (`harness.yml` has no
+mise/Julia setup step) -- matches the harness's existing "skip languages the
+machine does not have" design, same as codelldb or js-debug would skip on a
+runner missing them. Not proposing to add it; a full Julia toolchain per CI
+run is a real cost for a language nothing else here depends on, and the
+config's own behaviour (skip cleanly, say why) is already the point.
+
+---
+
+## 67. The Julia leak was the small version of a much bigger one
+
+**Not a decision. A second real resource leak, found chasing the first.**
+
+Verifying Julia (entry 66) left three real `julia ... DebugAdapter.DebugSession`
+processes running after their test runs ended. Chasing why turned up
+something much larger: `nvim-dap` starts a **server**-type adapter's
+executable detached, in its own process group, deliberately, so the adapter
+can survive a Neovim that crashes -- which also means the harness's own
+`tmux kill-server` (entry 64's fix) never reaches it either. Julia is one
+example. `js-debug`'s `pwa-chrome` adapter is a much bigger one: every tsx
+debugger run left an entire headless Chrome tree behind -- the adapter's own
+node server plus Chrome's zygote, gpu-process, network and storage
+utilities, and every renderer, eight to ten processes per run. Five full
+trees were found still running, one from the previous day, all rooted at
+init. **Over 4GB combined**, cleaned up by hand before the fix below went in.
+
+Fixed generally in both `nvim-drive.sh` and `film.sh` rather than as another
+per-adapter special case: `cleanup()` now asks tmux for the pane's PID
+before killing the server, walks its full descendant tree (`ps -A -o
+pid=,ppid=` piped through an awk that builds the parent-to-children map and
+walks it -- not `--ppid`, which is GNU-only and would not run on
+`debuggers-macos`), and after `kill-server` runs, signals anything from that
+snapshot still alive. Covers Julia and js-debug today without knowing either
+by name, and whatever server-type adapter comes next.
+
+Writing the fix reproduced the exact bug this session has now found and
+fixed four times: `kill -0 "$pid" 2>/dev/null && kill -KILL "$pid"
+2>/dev/null` as a bare statement, under `set -Eeuo pipefail`, ends the whole
+`cleanup()` function the moment `kill -0` reports the process already
+gone -- which is the good outcome, the one this code exists to handle.
+Caught by the same symptom as every previous instance: `nvim-drive.sh`
+started reporting "the driver gave up" on a plain, working find-file case,
+in a script the change never should have touched the exit code of.
+Rewritten as a proper `if`. Verified: all seven debuggers still stop where
+told, the full local screen suite (13 driven runs) still passes, and a
+process listing shows nothing left over after either.
