@@ -1461,6 +1461,15 @@ typescript and rust --- the three that do not depend on a second live
 process --- keep enforcing; tsx now reports without failing the job. Still
 worth seeing when it fails, so it still prints.
 
+**Update:** not Windows-only after all. The identical signature (breakpoint
+verified, then the browser process exits with nothing further) showed up on
+`debuggers-macos`, which runs `check-debuggers.sh` --- a different script
+from the one this entry was written against, driven over real tmux keys
+rather than headless, and one that had never received the flaky/failures
+split above at all: every tsx mismatch there was an unconditional failure,
+gating the job every time it happened to land on this. Given the same
+treatment now, in `check-debuggers.sh` alongside `check-debuggers-headless.sh`.
+
 ---
 
 ## 58. The stack is ready to merge. Yours to say go.
@@ -1668,3 +1677,32 @@ terminal, not running anything -- a resource leak, not an execution or data
 exposure. Logged here because "careful with memory/storage, cleanup
 enforced" is explicit standing instruction, not because anything was found
 running that should not have been.
+
+---
+
+## 65. hover.keys flaked once, on content rather than on timing
+
+**Not a decision. Worth watching, not yet worth acting on.**
+
+The same commit ran through `gates` (ubuntu) twice in parallel -- once as a
+push-triggered run, once as the paired pull-request run. The push run
+matched all 14 screens; the pull-request run reported `1 of 14 screens
+differ`, and it was `hover`: expected
+`function M.add(a: number, b: number)` / `-> number`, drawn
+`function M.add(a, b)` with no return type. Real content, not an empty pane
+--- lua_ls answered, just with less resolved than usual.
+
+`hover.keys` already carries the fix from the entry this session's summary
+calls "the hover screen's longer wait": ten attempts, each a fresh editor
+and a fresh lua_ls, fifteen seconds settle on the last one. A partial-type
+hover surviving all ten attempts on one of two identical parallel runs
+suggests the ten attempts are not independent draws the way that fix assumed
+--- if whatever slows lua_ls down on a loaded runner is a property of the
+runner for the whole job rather than of one attempt, ten retries buy nothing.
+
+Not decoupled from the gate the way tsx was (entry 57): this is one
+occurrence, not the one-in-three rate that justified that for a
+browser-dependent case, and hover is core editor behaviour with no second
+live process to blame. If it recurs, the fix is probably watching for a
+resolved signature specifically (retry until the type annotations appear, not
+just until any hover appears) rather than more attempts of the same kind.
