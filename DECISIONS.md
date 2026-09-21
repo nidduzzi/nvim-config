@@ -1515,3 +1515,28 @@ treesitter parser installed, or, as here, in a test harness that loads none
 on purpose. Nothing to fix --- the design is "resets on a real move," and a
 20-line window is a reasonable answer to "was that a real move" when there
 is no syntax tree to ask instead.
+
+---
+
+## 60. All three CI runners already have a real browser
+
+**Not a decision. Worth knowing, found writing browser_spec.lua.**
+
+    ubuntu-latest    /usr/bin/google-chrome, on PATH
+    macos-latest     /Applications/Google Chrome.app, an installed application
+    windows-latest    an installed application under Program Files
+
+Every runner this repository's own CI matrix uses already has a real Chrome,
+each found through a different one of `util/browser.lua`'s three lookups. A
+test that means to prove "nothing is found" or "the Playwright fallback is
+what answers" has to neutralise PATH, `M.installed.mac`/`.win32`, and point
+`PLAYWRIGHT_BROWSERS_PATH` somewhere empty, all three at once --- clearing
+only PATH passed locally and failed on macOS and Windows for two entirely
+different reasons before that was clear.
+
+Consequence for `check-debuggers.sh`'s own TSX case: the browser it finds in
+CI is never Playwright's --- it is the runner's own installed one, every
+time. That gate has been proving something slightly different from what its
+comments say since the runner images changed under it, not from anything in
+this session. Worth a look, not urgent: the case still stops at a real
+breakpoint through a real browser, which is the thing that actually matters.
