@@ -112,15 +112,33 @@ local function mason_debugpy()
   return mason_payload("debugpy", inside), { "-m", "debugpy.adapter" }
 end
 
---- The server js-debug ships, and the node that runs it.
+--- A port nothing is listening on.
+---
+--- nvim-dap substitutes `${port}` for one of these itself, and on Windows the
+--- substitution did not happen: the adapter was started with the placeholder
+--- and the editor tried to connect to a port called ${port}. Choosing it here
+--- means the number the server is told is the number that is dialled.
+---@return integer
+local function free_port()
+  local probe = assert(vim.uv.new_tcp())
+  probe:bind("127.0.0.1", 0)
+  local port = probe:getsockname().port
+  probe:close()
+  return port
+end
+
+--- The server js-debug ships, the node that runs it, and the port they agree
+--- on.
 ---@return string|nil command
 ---@return string[] args
+---@return integer port
 local function mason_js_debug()
   local server = mason_payload("js-debug-adapter", { "js-debug", "src", "dapDebugServer.js" })
   if not server or vim.fn.executable("node") ~= 1 then
-    return nil, {}
+    return nil, {}, 0
   end
-  return vim.fn.exepath("node"), { server, "${port}" }
+  local port = free_port()
+  return vim.fn.exepath("node"), { server, tostring(port) }, port
 end
 
 ---@param root string
@@ -605,12 +623,12 @@ return {
       -- loaded and the program can be found.
       for _, name in ipairs({ "pwa-node", "pwa-chrome" }) do
         dap.adapters[name] = function(callback)
-          local node, server_args = mason_js_debug()
+          local node, server_args, port = mason_js_debug()
           if node then
             callback({
               type = "server",
               host = "127.0.0.1",
-              port = "${port}",
+              port = port,
               executable = { command = node, args = server_args },
             })
             return
