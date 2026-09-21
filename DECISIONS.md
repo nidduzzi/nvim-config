@@ -1246,7 +1246,7 @@ missing configuration.
 
 ## 52. The browser debugger, and the one machine it will not start on
 
-**Needs nothing from you yet. Written down so it is not discovered twice.**
+**Settled. The cause was the harness, not the browser.**
 
 Six languages stop on macOS in CI: python, typescript, c, cpp, rust, and julia
 where julia is installed. The seventh, TSX in a browser, does not --- and the
@@ -1264,8 +1264,19 @@ browser's own rather than the default one; serving with node after python's
 http.server bound nothing at all on that runner. The first, second and fourth
 were real defects and are fixed. The third changed nothing.
 
-So the macOS job runs the six, and the browser case is checked on Linux and by
-hand. The gap is here rather than hidden behind a green tick.
+None of those was the reason, and the first three were fixed on the way past.
+The reason was that **every Ex command the harness sent on macOS was dropped**:
+the driver delivers them over RPC, that call failed on every macOS run, and the
+failure went to /dev/null. So the configuration was never made headless. Chrome
+opened a window on a machine with no screen, and waited.
+
+The driver types the command at the editor when the RPC call fails --- which is
+how the keys get there in the first place --- and macOS now stops in all six,
+the browser case included.
+
+The step that found it was making the harness prove it had changed anything:
+the Ex command leaves a marker, and its absence is reported as what it is
+rather than as a debugger that did not stop.
 
 ---
 
@@ -1330,8 +1341,8 @@ editor in the picture, which ruled out node and the package in one run.
 
 Where each platform stands:
 
-    Linux    seven, driven through the keys and the frame, plus the browser
-    macOS    six, driven; the browser case is a Chrome that will not connect
+    Linux    seven, driven through the keys and the frame, browser included
+    macOS    six, driven, browser included; julia is not installed there
     Windows  three, headless, because there is no tmux to drive
 
 ---
