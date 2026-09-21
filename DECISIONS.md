@@ -1848,3 +1848,19 @@ timings, nothing from the files' content), and was deleted rather than
 kept. `jupyter` (87 tracked files) is real but small; nothing else checked
 turned out to be a substantial clone. The three already in the stress tour
 remain the right set for this kind of test on this machine.
+
+---
+
+## 71. run-probes.sh's budget actually fails, verified directly
+
+**Not a decision. The plan's own verification item 6 had only ever been
+watched pass; this made it fail on purpose.**
+
+`run-probes.sh -b 0` against the fixture, an impossible budget every real
+call exceeds: printed `over the 0ms budget:` for every measured call, as
+expected. First read of `$?` came back 0 -- a mistake in the check, not the
+gate: it was read after `| tail -15`, so it was `tail`'s exit status, not
+`run-probes.sh`'s, the exact class of bug this whole session has hunted,
+this time in a throwaway one-line test rather than in committed code.
+Redone without the pipe: exit 1, for real. The gate has always set `status=1`
+and exited it correctly; it had just never been proven to fail before.
