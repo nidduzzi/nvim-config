@@ -1491,3 +1491,27 @@ together rather than one trailing the other.
 
 Say go and this finishes in the order above. Nothing about it is still being
 worked out.
+
+---
+
+## 59. What "the ladder resets when you move" actually resets on
+
+**Not a decision. Worth knowing, found while writing the first spec for
+`hint.lua`.**
+
+The doc comment says the hint ladder "resets when you move somewhere else."
+What it actually tracks is `context.here()`'s start line --- a treesitter
+node's range when a parser is attached, or a plain +/-20 line window around
+the cursor when there is none. Inside that window the start does not move,
+so on an untyped buffer or one with no parser installed, moving the cursor a
+few lines does not reset anything: the ladder only resets once the window
+itself shifts, which on the fallback path is roughly a 20-line move, or on
+crossing into a different function when a parser is attached.
+
+A person using this day to day is almost always inside a real, parsed
+buffer, where the reset is per-function and matches the doc comment closely.
+The fallback's coarser granularity only shows up in a language with no
+treesitter parser installed, or, as here, in a test harness that loads none
+on purpose. Nothing to fix --- the design is "resets on a real move," and a
+20-line window is a reasonable answer to "was that a real move" when there
+is no syntax tree to ask instead.
