@@ -1540,3 +1540,42 @@ time. That gate has been proving something slightly different from what its
 comments say since the runner images changed under it, not from anything in
 this session. Worth a look, not urgent: the case still stops at a real
 breakpoint through a real browser, which is the thing that actually matters.
+
+## 61. The set -e/pipefail bare-assignment audit is closed
+
+**Not a decision. Closing out the sweep entries 57 and 60's tail referred to.**
+
+Two more real instances of the same bug found and fixed, both in
+`dotfiles/tools/nvim-harness`:
+
+- `check-debuggers-headless.sh:183` --- the failure-reporting branch's own
+  `said=$(grep -oE '...' "$answered" | head -1)` died on pipefail exactly
+  when the editor's answer matched none of the four expected phrasings ---
+  inside the branch that exists to explain a failure.
+- `record-stress-tour.sh:47` --- `film_in()`'s `tracked=$(git -C "$project"
+  ls-files | wc -l)` died on pipefail whenever `$project` existed but was
+  not a git repository, true of at least two real directories this harness
+  has pointed at (`forgejo`, `keycloak`), before the SKIPPED message a few
+  lines up ever got the chance to run.
+
+Both fixed with the same `|| true` pattern as `run-probes.sh`'s two earlier
+fixes, both sabotage-verified against a real non-matching answer and a real
+non-git directory, both re-run against the full local gate suite
+(`check-syntax.sh`, `check-debuggers-headless.sh`, `scripts/test`) before
+push.
+
+Two remaining candidates from the same grep swept and ruled safe, not this
+bug class:
+
+- `check-key-names.sh:37` --- `seen=$(tmux ... capture-pane -p | tr -d
+  '\n')`. A pane always has content; `tr` never fails; a nonzero status here
+  means tmux itself broke, which is a real harness fault worth aborting
+  loudly on, not a normal "nothing found" outcome.
+- `agent-canary.sh:203` --- `WANT=$(expected_registry)`, a shell function
+  whose body is a `case`/`printf` over three fixed strings with no default
+  arm. An unmatched `$RUNG` yields an empty `WANT`, not a nonzero exit ---
+  nothing in the function can fail the pipefail check at all.
+
+All 23 `pipefail`-using scripts in `tools/nvim-harness` have now been swept
+for this pattern. Four real instances found and fixed across this session
+(`run-probes.sh` x2, plus the two above); none outstanding.
