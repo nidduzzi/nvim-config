@@ -6,6 +6,18 @@
 
 local browser = require("util.browser")
 
+--- Windows spells the same file with backslashes and its own idea of case
+--- for an extension: harness-shimmed-tool.BAT is harness-shimmed-tool.bat,
+--- and %LOCALAPPDATA% has backslashes where vim.fs.joinpath always writes
+--- forward ones. Comparisons in this file go through this rather than a
+--- plain substring search, the same fix root_spec.lua's symlink spec needed
+--- for the same reason.
+---@param path string
+---@return string
+local function spelling(path)
+  return vim.fs.normalize(path):lower()
+end
+
 ---@param path string
 local function make_executable(path)
   vim.fn.mkdir(vim.fs.dirname(path), "p")
@@ -37,7 +49,7 @@ describe("playwright_cache", function()
     if vim.fn.has("win32") == 1 then
       assert.is_truthy(cache:find("ms%-playwright$"))
       if vim.env.LOCALAPPDATA then
-        assert.is_truthy(cache:find(vim.env.LOCALAPPDATA, 1, true))
+        assert.is_truthy(spelling(cache):find(spelling(vim.env.LOCALAPPDATA), 1, true))
       end
     elseif vim.fn.has("mac") == 1 then
       assert.is_truthy(cache:find("Library/Caches/ms%-playwright$"))
@@ -86,7 +98,7 @@ describe("executable", function()
 
     local found = browser.executable()
     assert.is_truthy(found)
-    assert.is_truthy(found:find(vim.fs.basename(named), 1, true))
+    assert.is_truthy(spelling(found):find(spelling(vim.fs.basename(named)), 1, true))
   end)
 
   it("picks the newest Playwright build by number, not by name order", function()
@@ -106,7 +118,7 @@ describe("executable", function()
 
     local found = browser.executable()
     assert.is_truthy(found)
-    assert.is_truthy(found:find("chromium%-2000"))
+    assert.is_truthy(spelling(found):find("chromium%-2000"))
   end)
 
   it("looks inside the platform's own chrome layout for the build it finds", function()
@@ -126,7 +138,7 @@ describe("executable", function()
 
     local found = browser.executable()
     assert.is_truthy(found)
-    assert.is_truthy(found:find(cache, 1, true))
+    assert.is_truthy(spelling(found):find(spelling(cache), 1, true))
   end)
 
   it("is nil rather than an error when nothing anywhere has a browser", function()
