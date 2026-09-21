@@ -633,11 +633,14 @@ return {
               host = "127.0.0.1",
               port = port,
               executable = { command = node, args = server_args },
-              -- nvim-dap gives up after fourteen tries a quarter of a second
-              -- apart. Node starting cold on Windows takes longer than that,
-              -- and what the editor reports is ECONNREFUSED -- which reads as
-              -- an adapter that was never installed.
-              options = { max_retries = 80 },
+              -- nvim-dap gives up connecting after fourteen tries a quarter of a
+              -- second apart, and separately gives up on the initialize
+              -- handshake after four seconds even once connected. Node
+              -- starting cold on Windows, and a real browser launching after
+              -- it, both take longer than either default: the first showed
+              -- up as ECONNREFUSED, and fixing only that traded it for
+              -- "Debug adapter didn't respond" a step later.
+              options = { max_retries = 80, initialize_timeout_sec = 30 },
             })
             return
           end
