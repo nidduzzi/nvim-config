@@ -551,16 +551,30 @@ return {
       -- js-debug-adapter -- a .CMD on Windows, which is a script rather than
       -- a program. Wrapped where they are found rather than redefined, so
       -- whatever else that extra decides about them still holds.
+      -- Defined as functions rather than edited in place: LazyVim's extra
+      -- writes these adapters when it loads, which is after this runs, so a
+      -- table fixed up here was overwritten before any session used it. A
+      -- function is asked at the moment a session starts, when mason has
+      -- loaded and the program can be found.
       for _, name in ipairs({ "pwa-node", "pwa-chrome" }) do
-        local defined = dap.adapters[name]
-        if type(defined) == "table" and type(defined.executable) == "table" then
-          local found = defined.executable.command
-          if vim.fn.executable(found) ~= 1 then
-            found = from_mason(found) or found
+        dap.adapters[name] = function(callback)
+          local found = vim.fn.exepath("js-debug-adapter")
+          if found == "" then
+            found = from_mason("js-debug-adapter") or ""
           end
-          local program, arguments = spawnable(found, defined.executable.args)
-          defined.executable.command = program
-          defined.executable.args = arguments
+
+          if found == "" then
+            vim.notify(missing("js-debug-adapter", project_root()), vim.log.levels.ERROR, { title = "Debugger" })
+            return
+          end
+
+          local program, arguments = spawnable(found, { "${port}" })
+          callback({
+            type = "server",
+            host = "127.0.0.1",
+            port = "${port}",
+            executable = { command = program, args = arguments },
+          })
         end
       end
 
