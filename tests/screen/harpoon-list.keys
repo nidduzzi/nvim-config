@@ -1,0 +1,13 @@
+# Harpoon's list is a file under XDG_DATA_HOME, outside anything this
+# harness isolates, and a real day-to-day list of pinned files sits there
+# already -- cleared first, so the frame shows only what this test pinned
+# rather than whatever the actual pinned list happens to hold that day.
+# size: 100x24
+ex:lua require("harpoon"):list():clear()
+ex:edit app.py
+keys:Space h a
+ex:edit lib.lua
+keys:Space h a
+ex:edit README.md
+keys:Space h a
+keys:Space h h
