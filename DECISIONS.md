@@ -1460,3 +1460,34 @@ not one in four, which is too often to keep gating a job on. python,
 typescript and rust --- the three that do not depend on a second live
 process --- keep enforcing; tsx now reports without failing the job. Still
 worth seeing when it fails, so it still prints.
+
+---
+
+## 58. The stack is ready to merge. Yours to say go.
+
+**Needs you: an explicit go-ahead. This session's own permissions require it
+for a merge, separately from anything about readiness.**
+
+All three PRs are clean and mergeable, checked directly against GitHub right
+now:
+
+    nvim-config #3  debuggers → claude-manual       CLEAN, MERGEABLE
+    nvim-config #2  claude-manual → master          CLEAN, MERGEABLE
+    dotfiles    #2  audit-single-keys → main        CLEAN, MERGEABLE
+
+CI is green on every job on every one of them. Attempting the first merge
+just now was refused by this session's own permission layer, not by GitHub
+and not by a defect in the branches: merging is gated for your decision
+regardless of readiness, and correctly so.
+
+The order that keeps history honest: nvim-config #3 into claude-manual,
+then claude-manual into master, both as merge commits, never squashed or
+rebased, exactly as asked. Then dotfiles' submodule at `neovim/.config/nvim`
+--- currently pinned to `21e126b`, the commit master was at before any of
+this started --- needs bumping to the new master tip, as its own commit on
+`audit-single-keys` before that PR merges, so the submodule pointer and the
+harness's own `CONFIG_REF: debuggers` default in `harness.yml` both move
+together rather than one trailing the other.
+
+Say go and this finishes in the order above. Nothing about it is still being
+worked out.
