@@ -1974,3 +1974,40 @@ touched is an operational script (a probe or check loaded with `luafile`),
 not fixture content shown on screen, so safe by construction -- confirmed
 by the full screen suite and debugger suite already passing twice in CI on
 top of these changes. Nothing else broken.
+
+---
+
+## 77. The harness is being rewritten from bash to Python
+
+**Needs you: this is a large, in-progress structural change to
+`tools/nvim-harness/`, done at your explicit direction. Not a decision point
+so much as a standing notice while it's underway.**
+
+You asked to consolidate the harness before the three open PRs merge, and
+chose a full bash-to-Python rewrite over a smaller "merge the obvious
+duplicates" option. In progress on `dotfiles`' `audit-single-keys` branch,
+one phase at a time, each committed and pushed once verified: `harness/`
+package alongside the existing `.sh` files (not replacing them yet -- that's
+the last step, once every piece has been ported and CI has run green on the
+new code end to end). `.lua` files are untouched throughout; they run inside
+Neovim itself and are not in scope. See the plan at
+`.claude/plans/vectorized-popping-summit.md` for the full shape.
+
+Landed so far: `driver.py`/`film.py` (the shared tmux/RPC engine
+`nvim-drive.sh` and `film.sh` used to duplicate ~150 lines of each, now one
+class, using `pynvim` for RPC instead of a fresh `nvim --server
+--remote-expr` subprocess per call), `fixtures.py` (verified byte-for-byte
+identical fixture output against both `make-fixture.sh` and
+`make-debug-fixtures.sh`), and `gates.py` (seven gates, each independently
+sabotage-tested to fail for real and pass for real, matching the standard
+already established in entries 71-73).
+
+One real bug found in the bash originals along the way, moot once they're
+deleted but worth recording: `check-key-names.sh`'s own collision regex is
+double-quoted around a literal `$-`, which bash expands to the shell's
+current option-flags string before grep ever sees it -- silently dropping
+both the `$` and the `-` from its character class. Every hyphenated or
+`$`-containing token (`M-s`, `C-d`, `pwa-chrome`) has therefore never
+actually been checked against tmux's key-name collisions by this gate. The
+Python port doesn't inherit the bug; the 5 additional tokens it now checks
+were tested for real and none collide.
