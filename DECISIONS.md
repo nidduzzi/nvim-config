@@ -1918,3 +1918,40 @@ already has the strongest verification this kind of logic can get: entries
 debuggers start their real adapter and stop at a real breakpoint, on
 ubuntu, macOS and Windows. A unit test of `free_port()` in isolation would
 prove less than that already does. Left alone, same call as `panel.lua`.
+
+---
+
+## 75. Comments cut across the harness; a sixth set -e/pipefail bug found doing it
+
+**Not a decision. Two things closed at once.**
+
+The user asked directly: too many comments, cut by 90%. A fork went through
+every script in `tools/nvim-harness/`, keeping the load-bearing gotchas
+(mise shims, GNU-vs-BSD `ps`/`sed`, bash 3.2, the `set -e` traps themselves,
+`Usage:` blocks) and cutting the narrative "found while investigating..."
+history that belongs in this file, not in code. Density landed at roughly
+8-17% per file, close to the ask; a few (`nvim-drive.sh` 22%, `try.sh` 23%,
+`check-syntax.sh` 21%) sit higher for real reasons checked by hand --
+`nvim-drive.sh`'s options doc alone is a third of its total, and what is
+left elsewhere is exactly the kind of note this session has repeatedly
+needed. Verified before pushing: syntax, the full screen suite, and the
+full seven-language debugger suite all still passed, and a diff review
+confirmed only comments and blank lines moved.
+
+The push itself then failed on `check-debuggers.sh` -- not from the comment
+edit. `check-debuggers.sh:187-192`'s tsx failure-reporting branch had a
+bare `grep | sort | head | sed` reading `jsdebug.log` for an error phrase,
+unguarded, under `pipefail`: when the log genuinely contains neither phrase
+(a normal outcome for a browser that just exited, not an error), grep exits
+1 and the whole script dies right there -- inside the branch that exists to
+report a failure, before tsx's own flaky/non-gating logic ever gets to run.
+Pre-existing, not from the cleanup; it had simply never been exercised with
+a trace matching neither pattern before now. The sixth real instance of
+this exact bug class this session (`run-probes.sh` x2, `check-debuggers-
+headless.sh`, `record-stress-tour.sh`, `nvim-drive.sh`/`film.sh`'s cleanup,
+now this). Reproduced the unfixed shape in isolation first to confirm the
+cause, then confirmed the fix reaches the end normally with the same input.
+Also asked to research bash alternatives: CUE doesn't fit (a config/schema
+language, not a scripting one); tmux itself is the right low-level tool
+here; the recommendation given was Python for anything new or re-touched,
+not a rewrite -- the codebase already leans that way for its hardest parts.
