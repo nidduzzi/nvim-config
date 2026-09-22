@@ -1955,3 +1955,22 @@ Also asked to research bash alternatives: CUE doesn't fit (a config/schema
 language, not a scripting one); tmux itself is the right low-level tool
 here; the recommendation given was Python for anything new or re-touched,
 not a rewrite -- the codebase already leans that way for its hardest parts.
+
+---
+
+## 76. The comment cleanup's fixture-content damage was fully contained
+
+**Not a decision. Closing out entry 75's other half.**
+
+After finding and fixing `make-fixture.sh`'s broken `buggy.lua` heredoc
+(entry 75), audited the rest of the 33-file cleanup commit for the same
+shape of mistake. `make-debug-fixtures.sh` carries the same risk (heredocs
+building real fixture source), and one comment inside a heredoc did shrink
+-- `tsx/index.tsx`'s `setInterval` comment, trimmed from three lines to two.
+Checked directly: it sits well after line 9, the tsx debugger's breakpoint
+line, so nothing about where the debugger stops shifted, and it has already
+passed in every CI and local run since. Every other file the cleanup
+touched is an operational script (a probe or check loaded with `luafile`),
+not fixture content shown on screen, so safe by construction -- confirmed
+by the full screen suite and debugger suite already passing twice in CI on
+top of these changes. Nothing else broken.
