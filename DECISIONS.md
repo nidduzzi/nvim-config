@@ -2011,3 +2011,60 @@ both the `$` and the `-` from its character class. Every hyphenated or
 actually been checked against tmux's key-name collisions by this gate. The
 Python port doesn't inherit the bug; the 5 additional tokens it now checks
 were tested for real and none collide.
+
+---
+
+## 78. The harness rewrite is done and green in real CI
+
+**Not a decision. Closes entry 77.**
+
+`tools/nvim-harness/` went from 42 files (23 `.sh`, 9 `.py`, 10 `.lua`,
+3,275 bash lines) to a Python package (`harness/`, one entry point, 24
+files total) plus the unchanged `.lua` files. Three real duplications
+consolidated along the way rather than ported blindly: `nvim-drive.sh` and
+`film.sh`'s ~150 duplicated lines of tmux/RPC plumbing into one
+`NvimDriver`; `check-debuggers.sh`/`check-debuggers-headless.sh`'s
+near-identical per-language `CASES` table into one, mode-switched; three
+gate scripts' identical fixture/probe/report skeleton into one
+`run_lua_probe()` helper. RPC now goes over a persistent `pynvim`
+connection rather than a fresh `nvim --server --remote-expr` subprocess per
+call.
+
+CI (`.github/workflows/harness.yml`, `canary.yml`) now calls
+`python3 tools/nvim-harness/harness.py <command>` throughout; every
+retired `.sh` file, and the five `.py` utilities genuinely merged into
+`harness/reporting.py`, are deleted. `duplicate-keys.py`,
+`keymap-collisions.py` stayed in place, still imported directly (never
+bash, never actually part of this problem). `rung-flags-match.py` also
+stayed in the first cutover commit, on the same reasoning -- wrongly: it
+turned out to read `agent-canary.sh`'s own source as text, a dependency
+missed entirely until deleting `agent-canary.sh` broke it in the first
+real CI run. Fixed and deleted properly once that surfaced.
+
+Real CI, not just local runs, is what actually closed this out -- three
+more real bugs found only once it ran for real, across four pushes:
+
+- The four gates driven bare (no `-c`/`-n`, matching how the bash
+  originals were always called, each with its own internal default) never
+  resolved a default `config_dir`/`appname` the way `check_syntax` and
+  `check_keymaps` already did -- `drive()` has no fallback of its own, so a
+  bare invocation launched Neovim with no config at all. Every local
+  verification during the port had `XDG_CONFIG_HOME`/`NVIM_APPNAME`
+  exported globally in the test shell, which is exactly why this never
+  showed up until real CI ran the same bare invocation for real -- a gap
+  in the test methodology as much as the code.
+- `debuggers-windows` hung the full 15-minute job timeout with zero
+  output: progress prints used `end=""` with no `flush=True` (invisible on
+  non-TTY CI output until the process exits), and the actual per-case
+  subprocess wait had no deadline at all, unlike every other wait loop in
+  this codebase.
+- Fixing that exposed the real cause underneath: `stdout=subprocess.PIPE`
+  polled in a `while proc.poll() is None: sleep()` loop with nothing ever
+  reading it -- a textbook pipe deadlock, indistinguishable from a hung
+  editor from the outside, and consistent with every language timing out
+  identically rather than some hanging and others not. Fixed by draining
+  on a background thread, which also now captures whatever did print
+  before a timeout instead of discarding it.
+
+All three PRs (`nvim-config` #3/#2, `dotfiles` #2) confirmed `CLEAN` and
+green again after this. Same standing call as entry 58: merging is yours.
