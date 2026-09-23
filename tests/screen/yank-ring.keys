@@ -1,0 +1,13 @@
+# yanky's ring is a sqlite database under XDG_DATA_HOME, outside anything
+# this harness isolates, and a real day-to-day yank history sits there
+# already -- cleared first, so the frame shows only what this test yanked
+# rather than history_length's worth of whatever was yanked for real.
+# size: 100x24
+ex:lua require("yanky.history").clear()
+ex:edit app.py
+keys:yy
+ex:edit lib.lua
+keys:yy
+ex:edit README.md
+keys:yy
+keys:Space s y

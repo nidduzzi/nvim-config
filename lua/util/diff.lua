@@ -50,7 +50,10 @@ function M.toggle_merge()
     return
   end
 
-  local conflicts = vim.fn.systemlist("git diff --name-only --diff-filter=U")
+  -- A list, not a string: a string is handed to 'shell', which differs
+  -- between machines and quotes differently on Windows. Nothing here needs a
+  -- shell.
+  local conflicts = vim.fn.systemlist({ "git", "diff", "--name-only", "--diff-filter=U" })
 
   if vim.v.shell_error ~= 0 then
     vim.notify("Not inside a git repository.", vim.log.levels.WARN, { title = "Diff" })

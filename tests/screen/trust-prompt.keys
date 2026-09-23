@@ -1,0 +1,9 @@
+# size: 100x24
+# The question that appears when a file is opened in a project nobody has
+# vouched for. The harness trusts its own fixture before it starts, so the
+# trust is taken back here to make this the ordinary case: a repository you
+# have just cloned.
+ex:lua require("util.trust").revoke(vim.fn.getcwd()) require("util.git").forget() require("util.trust_menu").forget()
+ ff
+lib.lua
+Enter

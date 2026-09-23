@@ -1,0 +1,6 @@
+# needs: lsp
+# attempts: 4
+# pause: 18
+# size: 100x24
+keys:Space sg
+issueToken

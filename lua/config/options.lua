@@ -16,9 +16,18 @@ opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
 -- Ask about unsaved changes instead of refusing to quit.
 opt.confirm = true
 
--- Non-bash shells do not all take -c the same way.
-if vim.o.shell ~= "bash" then
-  opt.shellcmdflag = "-c"
+-- Neovim picks 'shellcmdflag' from the shell it finds, and gets it right for
+-- the shells it knows. The one it cannot know is a POSIX shell reached by an
+-- absolute path, where the name it compares against is "/usr/bin/zsh" rather
+-- than "zsh", so the flag stays at the default. Only that case is corrected,
+-- and only on a system whose shells take -c at all: cmd.exe takes /c and
+-- PowerShell takes -Command, and the old unconditional "-c" would have handed
+-- either of them a flag it does not have.
+if vim.fn.has("win32") == 0 then
+  local shell = vim.fs.basename(vim.o.shell)
+  if shell ~= "bash" and vim.tbl_contains({ "sh", "dash", "zsh", "ksh", "fish", "ash" }, shell) then
+    opt.shellcmdflag = "-c"
+  end
 end
 
 -- Copy through OSC 52, which reaches the clipboard of whatever terminal is

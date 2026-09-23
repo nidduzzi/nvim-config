@@ -1,0 +1,11 @@
+# size: 100x24
+# attempts: 3
+# The debugger's own windows, opened without a session: what is being checked
+# is the layout this configuration gets, not a program stopping at a line,
+# which would need a language toolchain on whatever machine runs this.
+#
+# Without a session the panels carry no titles, so what the frame proves is
+# the layout and the two things that are always there: the REPL's `dap>`
+# prompt and the watch panel's `No Expressions`.
+ex:lua require("lazy").load({ plugins = { "nvim-dap-ui" } })
+ex:lua pcall(function() require("dapui").open() end)

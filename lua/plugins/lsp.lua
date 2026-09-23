@@ -42,15 +42,10 @@ return {
           },
         },
 
-        -- Pyrefly exits quietly when it fails, so say so rather than leaving
-        -- the buffer with no type information and no explanation.
-        pyrefly = {
-          on_exit = function(code, _, _)
-            vim.schedule(function()
-              vim.notify("Pyrefly LSP exited with code: " .. code, vim.log.levels.INFO)
-            end)
-          end,
-        },
+        -- Pyrefly exits quietly when it fails. Every server here now says so
+        -- --- see report_exit in util/lsp.lua --- so this needs nothing of
+        -- its own.
+        pyrefly = {},
 
         -- ty: Astral's Python type checker. Like the others, it starts only
         -- where the project provides it.
@@ -85,6 +80,14 @@ return {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
+      -- Mason installs a Python package by making a virtualenv with the
+      -- python3 it finds on PATH. A distribution python3 often cannot make
+      -- one --- ensurepip is a separate package on Debian and its
+      -- descendants --- and :MasonInstall debugpy fails with "spawn: python3
+      -- failed with exit code 1", which says nothing about what is missing.
+      -- If this machine has an interpreter that can, it goes first.
+      require("util.python").prefer_usable()
+
       opts.ensure_installed = { "lua-language-server", "stylua" }
       return opts
     end,

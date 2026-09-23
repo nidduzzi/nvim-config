@@ -2,7 +2,13 @@
 ---
 --- Deliberately not a chat sidebar. A sidebar is a place a conversation lives,
 --- and a conversation that lives somewhere becomes the thing you work in. This
---- opens, answers, and goes away on q, leaving the buffer you were typing in.
+--- opens, answers, and goes away as soon as you carry on --- the first cursor
+--- move, insert or buffer change closes it --- leaving you in the buffer you
+--- were typing in. `<a-q>` closes it sooner, and the footer says so.
+---
+--- Nothing focuses it, which is the point: an answer you have to leave is an
+--- answer that interrupted you. The `q` and `<Esc>` maps below are for the
+--- case where you did focus it yourself.
 ---
 --- Nothing here is ever written to a file, and the buffer is not modifiable, so
 --- the only way an answer becomes code is if you type it.
@@ -18,6 +24,11 @@ function M.close()
     vim.api.nvim_win_close(win, true)
   end
   win = nil
+
+  -- The autocommands that were waiting to close it have nothing left to
+  -- close. Each is `once`, so the one that fired is gone, but the others are
+  -- still armed and would call this again on the next keystroke.
+  pcall(vim.api.nvim_clear_autocmds, { group = "agent-panel-close" })
 end
 
 --- Show text, as markdown, in a float sized to what it holds.

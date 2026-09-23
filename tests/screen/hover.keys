@@ -1,5 +1,11 @@
 # needs: lsp
-# attempts: 6
+# attempts: 10
+# The inlay hints in the buffer behind the hover arrive when the language
+# server answers, which on a cold runner is after the frame would otherwise
+# have been captured: the last batch waits for them rather than for a key.
+# Each attempt starts a fresh editor and a fresh lua_ls, so this is a cold
+# start every time, not just the first attempt -- six of them at 8s still
+# was not always enough under a loaded CI matrix.
 # size: 100x24
 Space
 ff
@@ -10,3 +16,4 @@ Enter
 ww
 K
 K
+wait:15:

@@ -61,7 +61,7 @@ local at = { key = "", rung = 0 }
 ---@return string
 local function position()
   local ctx = context.here()
-  return ("%s:%d"):format(vim.api.nvim_buf_get_name(0), ctx.first)
+  return ("%s:%d"):format(vim.api.nvim_buf_get_name(0), ctx and ctx.first or 1)
 end
 
 --- Take the next rung. Press again to climb; the last rung stays put rather

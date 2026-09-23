@@ -32,7 +32,10 @@ function M.commands()
   end
 
   table.sort(found, function(a, b)
-    return a.command < b.command
+    if a.command ~= b.command then
+      return a.command < b.command
+    end
+    return a.client.name < b.client.name
   end)
 
   return found

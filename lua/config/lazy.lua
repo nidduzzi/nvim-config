@@ -6,7 +6,7 @@
 -- LazyVim owns that layer now, so what is left in lua/plugins is only what
 -- actually differs from the default.
 
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+local lazypath = vim.fs.joinpath(vim.fn.stdpath("data") --[[@as string]], "lazy", "lazy.nvim")
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
   local out = vim.fn.system({
     "git",
@@ -48,7 +48,12 @@ require("lazy").setup({
     version = false,
   },
   install = { colorscheme = { "tokyonight", "habamax" } },
-  checker = { enabled = true, notify = false },
+  -- Off, because the plugins here are pinned by lazy-lock.json and updating
+  -- them is a deliberate act. Enabled, it runs `git fetch` for every plugin
+  -- shortly after startup: 53 git processes, each one reaching github.com.
+  -- That is invisible here and is what a slow start on another machine is
+  -- made of. `:Lazy check` asks the same question when the answer is wanted.
+  checker = { enabled = false },
   change_detection = { notify = false },
   performance = {
     rtp = {

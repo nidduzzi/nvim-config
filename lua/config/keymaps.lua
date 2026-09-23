@@ -21,6 +21,30 @@ map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 -- check rather than by noticing the feature had gone.
 map("n", "<leader>xD", vim.diagnostic.setloclist, { desc = "Diagnostics to location list" })
 
+-- The trust menu, on a key rather than only a command: trust is what decides
+-- whether this project's programs run, and a decision you can only reach by
+-- remembering a command name is one nobody revisits.
+map("n", "<leader>gt", function()
+  require("util.trust_menu").open(require("util.lsp").root(vim.fn.getcwd()))
+end, { desc = "Git: trust this project" })
+
+-- The git pickers are LazyVim's, and they run git. Rebound here so an
+-- untrusted project gets the refusal rather than the repository's own
+-- programs. See util/git.lua.
+for key, picker in pairs({
+  ["<leader>gs"] = "git_status",
+  ["<leader>gl"] = "git_log",
+  ["<leader>gL"] = "git_log_line",
+  ["<leader>gb"] = "git_log_line",
+  ["<leader>gf"] = "git_log_file",
+}) do
+  map("n", key, function()
+    require("util.git").guard(function()
+      Snacks.picker[picker]()
+    end)
+  end, { desc = "Git: " .. picker:gsub("_", " ") })
+end
+
 -- Watch the keys this config depends on. Something taking one of these means a
 -- feature quietly stopped existing, which is worth hearing about when it
 -- happens rather than when it is next needed.
@@ -170,3 +194,12 @@ end, { desc = "Stop the request in flight" })
 map("n", "<leader>aN", function()
   require("util.agent").reset()
 end, { desc = "Start a new conversation here" })
+
+-- The last thing this configuration does when it wires itself up.
+--
+-- LazyVim loads its own keymaps, then this file, on VeryLazy --- which is
+-- after the editor has drawn and after `v:vim_did_enter` is 1. Anything
+-- driving the editor from outside needs a signal that the keys exist, not
+-- that the editor started: keys sent in between go to a mapping that has not
+-- been made yet, which looks exactly like a feature that does nothing.
+vim.g.dotfiles_ready = true
