@@ -1,0 +1,5 @@
+# size: 100x24
+# The window an answer appears in. Opened directly rather than by asking an
+# agent: what is being checked is the panel, and a real request would make the
+# frame depend on a model's wording and on the network.
+ex:lua require("util.agent.panel").show("What this function does", "It adds two numbers.\n\nThe second paragraph is here to show wrapping, which the panel does by hand so it can size itself before it knows how its contents fold.", { footer = "claude · context" })

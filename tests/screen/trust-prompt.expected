@@ -1,0 +1,24 @@
+  1   -- NOTE: used by the harness to show LSP features
+   1   local M = {}
+   2
+   3   --- Add two numbers together.
+   4   ---@param a number
+   5   ---@param b number
+   6   ---@return number
+   7   fu╭─ Not trusted: PROJECT ─╮
+   8   │ │                                                                           3/TOTAL │
+   9   en│────────────────────────────────────────────────────────────────────────────────│
+  10     │ 1. Trust this project: run its programs and its git                            │
+  11   fu│ 2. Not now: ask again next time this project is opened                         │
+  12   │ │ 3. Trust every project on this machine (writes local.lua)                      │
+  13   en╰────────────────────────────────────────────────────────────────────────────────╯
+  14
+  15   return M
+
+
+
+
+
+
+
+ INSERT   BRANCH   ^\^N  Top 1:1   HH:MM

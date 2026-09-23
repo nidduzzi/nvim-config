@@ -58,6 +58,14 @@ M.defaults = {
   -- opening a file is enough. "ask" runs it only for a project trusted with
   -- :DotfilesTrustProject.
   lsp_project_bin = "ask",
+
+  -- Whether git may be run for a project. git executes programs a repository
+  -- names in its own .git/config -- textconv on a diff, core.fsmonitor on
+  -- almost any command -- so the signs, the diffs and the git pickers wait
+  -- for :DotfilesTrustProject. "ask" is that; true runs git everywhere, which
+  -- is the right answer for a machine that only ever holds your own
+  -- repositories; false never runs it.
+  git_project = "ask",
 }
 
 --- Every settable name, including the ones whose default is nil and so cannot
@@ -73,6 +81,7 @@ M.names = {
   "search_preset",
   "lsp_ignore",
   "lsp_project_bin",
+  "git_project",
 }
 
 --- Set for this session only. Nothing is written to disk.

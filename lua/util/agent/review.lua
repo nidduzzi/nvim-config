@@ -109,6 +109,9 @@ M.scopes = {
       -- The buffer goes too, so a finding can be placed on a real line; the
       -- diff only says which lines are worth looking at.
       local ctx = context.buffer()
+      if not ctx then
+        return nil
+      end
       return {
         text = ("%s\n\nAnd the change under review, as a diff:\n%s"):format(ctx.text, diff.stdout),
         first = 1,

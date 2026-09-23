@@ -1,0 +1,24 @@
+         ╭──────────────────────────────── Grep (code) 󰐰  ────────────────────────────────╮
+         │ issueToken                                                                2/TOTAL │
+         │────────────────────────────────────────────────────────────────────────────────│
+         │ 󰌞 src/auth.js:8:9 function issueToken(user) {                                  │
+         │ 󰌞 src/auth.js:12:34 module.exports = { validateToken, issueToken };            │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │                                                                                │
+         │──────────────────────────────────── auth.js ───────────────────────────────────│
+         │   5     return token.expiresAt > Date.now();                                   │
+         │   6   }                                                                        │
+         │   7                                                                            │
+         │   8   function issueToken(user) {                                              │
+         │   9     return { sub: user.id, expiresAt: Date.now() + 3600_000 };             │
+         │  10   }                                                                        │
+         │  11                                                                            │
+ INSERT ╰ 12 module.exports = { validateToken, issueToken }; ╯  HH:MM

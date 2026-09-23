@@ -23,18 +23,21 @@ M.limit = 30
 ---@return string
 local function store(kind, root)
   local dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "recall", kind)
-  vim.fn.mkdir(dir, "p")
+  require("util.private").mkdir(dir)
   return vim.fs.joinpath(dir, vim.fn.sha256(root):sub(1, 16))
 end
 
---- The project this belongs to, matching how the agent decides the same thing.
+--- The project these lists belong to.
+---
+--- The directory you are in, not the file you are looking at. The agent asks
+--- the same question of the buffer, because a conversation belongs to the
+--- code being discussed; a glob or a set of extensions belongs to the project
+--- being searched, and a search reads the directory. Asking the agent gave
+--- the two of them different answers whenever the buffer was outside the
+--- directory.
 ---@return string
 local function root()
-  local ok, agent = pcall(require, "util.agent")
-  if ok then
-    return agent.root()
-  end
-  return assert(vim.uv.cwd())
+  return require("util.lsp").root(assert(vim.uv.cwd()))
 end
 
 --- Everything remembered for this kind, most recent first.
@@ -75,87 +78,80 @@ function M.add(kind, value)
     end
   end
 
-  local fd = io.open(store(kind, root()), "w")
+  local path = store(kind, root())
+  local fd = io.open(path, "w")
   if fd then
     fd:write(table.concat(kept, "\n") .. "\n")
     fd:close()
+    require("util.private").narrow(path)
   end
+end
+
+--- The values the open prompt completes against. One prompt is open at a
+--- time, and the completion function is named in a string Vim resolves while
+--- it is open, so this is where the two meet.
+---@type string[]
+local offered = {}
+
+--- Completion for the open prompt, by prefix.
+---
+--- `customlist` completion does its own filtering, and prefix rather than
+--- fuzzy is what completing a path glob wants: typing `src` should not offer
+--- `.github/workflows/**` because the letters appear in order somewhere.
+---@param base string
+---@return string[]
+function M.complete(base)
+  return vim.tbl_filter(function(value)
+    return value:sub(1, #base) == base
+  end, offered)
 end
 
 --- Ask for text, offering what was typed here before.
 ---
---- With nothing remembered, and with no picker available, this is an ordinary
---- prompt — the recall is an addition, never a dependency.
----@param opts { kind: string, prompt: string, suggestions?: string[] }
+--- An ordinary prompt, not a picker: what you type is taken literally, `<Tab>`
+--- completes from what this project remembered, and `<Up>` walks the history.
+--- A picker was the first shape this took, and its query is a filter pattern
+--- rather than text — `!src/**` selected `docs/**`, because `!` inverts a
+--- snacks match. Globs, extension lists and questions all contain characters
+--- that pattern syntax claims.
+---
+--- `on_close` runs once the prompt is gone, whether it was answered or
+--- dismissed, so a caller that suspended something for the prompt's lifetime
+--- has one place to resume it.
+---@param opts { kind: string, prompt: string, suggestions?: string[], on_close?: fun() }
 ---@param on_done fun(value: string)
 function M.input(opts, on_done)
-  local function accept(value)
-    if not value or vim.trim(value) == "" then
-      return
-    end
-    M.add(opts.kind, value)
-    on_done(value)
-  end
-
-  local items = {}
+  offered = {}
   local seen = {}
   for _, source in ipairs({ M.list(opts.kind), opts.suggestions or {} }) do
     for _, value in ipairs(source) do
       if not seen[value] then
         seen[value] = true
-        table.insert(items, value)
+        table.insert(offered, value)
       end
     end
   end
 
-  if #items == 0 or not pcall(require, "snacks") then
-    vim.ui.input({ prompt = opts.prompt }, accept)
-    return
-  end
-
-  local entries = {}
-  for i, value in ipairs(items) do
-    table.insert(entries, { idx = i, text = value, value = value })
-  end
-
-  Snacks.picker.pick({
-    title = opts.prompt,
-    items = entries,
-    layout = { preset = "select" },
-    format = function(item)
-      return { { item.value, "SnacksPickerLabel" } }
-    end,
-    confirm = function(picker, item)
-      picker:close()
-      if item then
-        accept(item.value)
-      end
-    end,
-    -- Nothing matched means you are typing something new, which is the common
-    -- case the first few times. Take the query itself rather than making the
-    -- prompt a dead end.
-    actions = {
-      use_query = function(picker)
-        local query = picker:filter().pattern
-        picker:close()
-        accept(query)
-      end,
-    },
-    win = {
-      input = {
-        keys = {
-          ["<c-y>"] = { "use_query", mode = { "i", "n" }, desc = "Use exactly what I typed" },
-        },
-      },
-    },
-  })
+  vim.ui.input({
+    prompt = opts.prompt,
+    completion = "customlist,v:lua.require'util.recall'.complete",
+  }, function(value)
+    if value and vim.trim(value) ~= "" then
+      M.add(opts.kind, value)
+      on_done(value)
+    end
+    if opts.on_close then
+      opts.on_close()
+    end
+  end)
 end
 
 --- Directories whose contents are not this project's code.
 ---
---- Walking them is slow and the answers are wrong: the extensions inside
---- node_modules describe somebody else's project, and offering them as filters
---- for this one is worse than offering nothing.
+--- Only the last-resort walk uses this. git and ripgrep both read the
+--- project's own ignore files, which is the same question answered by the
+--- project rather than by a list written here; this is what is left when
+--- neither is installed.
 ---@type table<string, boolean>
 local vendored = {
   [".git"] = true,
@@ -191,11 +187,54 @@ end
 --- time the extension filter is opened. Once per project is plenty — the set
 --- of languages in a repository does not change while you are looking at it.
 ---@type table<string, string[]>
-local extension_cache = {}
+local file_cache = {}
 
 --- Forget the cached walks, for when a project really has changed shape.
 function M.rescan()
-  extension_cache = {}
+  file_cache = {}
+end
+
+--- The files this project contains, as paths relative to its root.
+---
+--- git first and ripgrep second, because both read the project's own ignore
+--- files: what counts as "not this project's code" is a question the project
+--- already answers, and both are one process rather than a walk. Walking
+--- label-studio took 218ms of blocking time; on a slower filesystem, seconds.
+---@return string[]
+local function project_files()
+  local where = root()
+  if file_cache[where] then
+    return file_cache[where]
+  end
+
+  -- git only where git may run: core.fsmonitor makes even ls-files a program
+  -- the repository chose. ripgrep reads the same ignore files and runs
+  -- nothing the project named.
+  local found, listed = {}, false
+  if require("util.git").allowed(where) then
+    found = vim.fn.systemlist({ "git", "-C", where, "ls-files" })
+    listed = vim.v.shell_error == 0
+  end
+
+  if not listed and vim.fn.executable("rg") == 1 then
+    found = vim.fn.systemlist({ "rg", "--files", "--color=never", where })
+    for index, path in ipairs(found) do
+      found[index] = vim.fs.relpath(where, path) or path
+    end
+    listed = vim.v.shell_error == 0
+  end
+
+  if not listed then
+    found = vim.fs.find(function(name, path)
+      return not is_vendored(path)
+    end, { path = where, type = "file", limit = 4000 })
+    for index, path in ipairs(found) do
+      found[index] = vim.fs.relpath(where, path) or path
+    end
+  end
+
+  file_cache[where] = found
+  return found
 end
 
 --- The file extensions this project actually contains, most common first, so
@@ -203,15 +242,8 @@ end
 ---@param limit? integer
 ---@return string[]
 function M.extensions(limit)
-  local where = root()
-  if extension_cache[where] then
-    return vim.list_slice(extension_cache[where], 1, limit or 15)
-  end
-
   local counts = {}
-  local found = vim.fs.find(function(name, path)
-    return name:match("%.[%w]+$") ~= nil and not is_vendored(path)
-  end, { path = where, type = "file", limit = 4000 })
+  local found = project_files()
 
   for _, file in ipairs(found) do
     local ext = file:match("%.([%w]+)$")
@@ -222,21 +254,30 @@ function M.extensions(limit)
 
   local exts = vim.tbl_keys(counts)
   table.sort(exts, function(a, b)
-    return counts[a] > counts[b]
+    if counts[a] ~= counts[b] then
+      return counts[a] > counts[b]
+    end
+    return a < b
   end)
 
-  extension_cache[where] = exts
   return vim.list_slice(exts, 1, limit or 15)
 end
 
 --- The top-level directories of this project, as globs, so the path filter has
 --- somewhere to start.
+---
+--- Taken from the files the project actually has rather than from a directory
+--- listing: a directory holding nothing the search would look at is not
+--- somewhere to start, and one the project ignores is not offered at all.
 ---@return string[]
 function M.top_level_globs()
+  local seen = {}
   local out = {}
-  for name, kind in vim.fs.dir(root()) do
-    if kind == "directory" and not name:match("^%.") and not vendored[name] then
-      table.insert(out, name .. "/**")
+  for _, file in ipairs(project_files()) do
+    local top = file:match("^([^/]+)/")
+    if top and not seen[top] then
+      seen[top] = true
+      table.insert(out, top .. "/**")
     end
   end
   table.sort(out)

@@ -14,17 +14,58 @@
 -- a project with a biome config gets biome and everything else falls back to
 -- prettierd. A project can override this in its own `.nvim.lua`.
 
+local formatters_by_ft = {
+  lua = { "stylua" },
+  javascript = { "biome", "prettierd", stop_after_first = true },
+  javascriptreact = { "biome", "prettierd", stop_after_first = true },
+  typescript = { "biome", "prettierd", stop_after_first = true },
+  typescriptreact = { "biome", "prettierd", stop_after_first = true },
+}
+
+--- Where a formatter comes from, asked the same way a language server is.
+---
+--- conform looks in node_modules/.bin before it looks at PATH, which is the
+--- right default for a project you wrote and an execution path for one you
+--- cloned: opening a JavaScript file in an untrusted repository and saving it
+--- ran that repository's prettierd. The formatter is a program in the project,
+--- exactly like a language server, and the answer is the same one --- it runs
+--- when the project is trusted, and PATH is used when it is not.
+---@param name string
+---@return fun(self: table, ctx: table): string
+local function guarded(name)
+  return function(_, ctx)
+    local lsp = require("util.lsp")
+    local from_project = lsp.project_bin(name, ctx and ctx.dirname or nil)
+    if from_project then
+      return from_project
+    end
+    -- Not exepath directly: a virtualenv activated by venv-selector, or a
+    -- direnv layout, puts the project's own bin directory on PATH, and then
+    -- "from PATH" is the project's program by another road.
+    return lsp.safe_exepath(name, ctx and ctx.dirname or nil)
+  end
+end
+
+--- Every formatter named above, each resolved through the trust gate.
+---@return table<string, table>
+local function guarded_formatters()
+  local guards = {}
+  for _, names in pairs(formatters_by_ft) do
+    for key, name in pairs(names) do
+      if type(key) == "number" then
+        guards[name] = { command = guarded(name) }
+      end
+    end
+  end
+  return guards
+end
+
 return {
   {
     "stevearc/conform.nvim",
     opts = {
-      formatters_by_ft = {
-        lua = { "stylua" },
-        javascript = { "biome", "prettierd", stop_after_first = true },
-        javascriptreact = { "biome", "prettierd", stop_after_first = true },
-        typescript = { "biome", "prettierd", stop_after_first = true },
-        typescriptreact = { "biome", "prettierd", stop_after_first = true },
-      },
+      formatters_by_ft = formatters_by_ft,
+      formatters = guarded_formatters(),
     },
   },
 

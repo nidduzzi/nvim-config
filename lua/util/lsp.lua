@@ -31,16 +31,66 @@ local M = {}
 --- This list is about where tools live, not about which languages are
 --- supported: a server for any language is found as long as its executable
 --- ends up in one of these.
----@type { marker: string, bin: string, why: string }[]
+--- A virtualenv puts its programs in `bin`, or in `Scripts` on Windows.
+--- Whichever is there is the answer, so neither name is assumed.
+---@param where string
+---@return string|nil
+local function venv_bin(where)
+  for _, name in ipairs({ "bin", "Scripts" }) do
+    if vim.fn.isdirectory(vim.fs.joinpath(where, name)) == 1 then
+      return name
+    end
+  end
+end
+
+---@type { marker: string, bin: string|fun(root: string): string|nil, why: string }[]
 M.bin_evidence = {
-  { marker = "pyvenv.cfg", bin = "bin", why = "a Python virtualenv names itself" },
-  { marker = ".venv/pyvenv.cfg", bin = ".venv/bin", why = "a Python virtualenv in the usual place" },
-  { marker = "venv/pyvenv.cfg", bin = "venv/bin", why = "a Python virtualenv in the other usual place" },
+  {
+    marker = "pyvenv.cfg",
+    bin = function(root)
+      return venv_bin(root)
+    end,
+    why = "a Python virtualenv names itself",
+  },
+  {
+    marker = ".venv/pyvenv.cfg",
+    bin = function(root)
+      local name = venv_bin(vim.fs.joinpath(root, ".venv"))
+      return name and vim.fs.joinpath(".venv", name)
+    end,
+    why = "a Python virtualenv in the usual place",
+  },
+  {
+    marker = "venv/pyvenv.cfg",
+    bin = function(root)
+      local name = venv_bin(vim.fs.joinpath(root, "venv"))
+      return name and vim.fs.joinpath("venv", name)
+    end,
+    why = "a Python virtualenv in the other usual place",
+  },
   { marker = "package.json", bin = "node_modules/.bin", why = "npm, pnpm and yarn all install here" },
   { marker = "composer.json", bin = "vendor/bin", why = "Composer's documented location" },
   { marker = "Gemfile", bin = ".bundle/bin", why = "Bundler's binstubs" },
   { marker = ".envrc", bin = ".direnv/*/bin", why = "direnv's layout directory" },
 }
+
+--- Programs called `name` in `dir`, whatever extension the platform gives
+--- them. A Windows executable is python.exe, not python.
+---@param root string
+---@param dir string
+---@param name string
+---@return string[]
+function M.executables_named(root, dir, name)
+  local found = {}
+  for _, pattern in ipairs({ name, name .. ".*" }) do
+    for _, candidate in ipairs(vim.fn.glob(vim.fs.joinpath(root, dir, pattern), false, true)) do
+      if vim.fn.executable(candidate) == 1 and vim.fn.isdirectory(candidate) == 0 then
+        found[#found + 1] = candidate
+      end
+    end
+  end
+  return found
+end
 
 ---@param root string
 ---@return string[]
@@ -50,19 +100,27 @@ function M.bin_dirs(root)
 
   local activated = vim.env.VIRTUAL_ENV
   if activated and activated ~= "" and vim.startswith(activated, root) then
-    found[#found + 1] = vim.fs.relpath(root, activated .. "/bin") or (activated .. "/bin")
-    seen[found[#found]] = true
-  end
-
-  for _, evidence in ipairs(M.bin_evidence) do
-    local marker = vim.fn.glob(root .. "/" .. evidence.marker, false, true)
-    if #marker > 0 and not seen[evidence.bin] then
-      seen[evidence.bin] = true
-      found[#found + 1] = evidence.bin
+    local name = venv_bin(activated)
+    if name then
+      local directory = vim.fs.joinpath(activated, name)
+      found[#found + 1] = vim.fs.relpath(root, directory) or directory
+      seen[found[#found]] = true
     end
   end
 
-  if vim.uv.fs_stat(root .. "/result/bin") and not seen["result/bin"] then
+  for _, evidence in ipairs(M.bin_evidence) do
+    local marker = vim.fn.glob(vim.fs.joinpath(root, evidence.marker), false, true)
+    local directory = evidence.bin
+    if type(directory) == "function" then
+      directory = directory(root)
+    end
+    if #marker > 0 and directory and not seen[directory] then
+      seen[directory] = true
+      found[#found + 1] = directory
+    end
+  end
+
+  if vim.uv.fs_stat(vim.fs.joinpath(root, "result", "bin")) and not seen["result/bin"] then
     found[#found + 1] = "result/bin"
   end
 
@@ -89,11 +147,19 @@ M.root_markers = {
 }
 
 --- The project root for a starting directory.
+---
+--- Resolved, because the same directory has more than one name. On macOS
+--- /var is a symlink to /private/var, so a root found from the working
+--- directory and a root found from a buffer's path can be the same place
+--- spelled two ways --- and every decision made by comparing them, from
+--- whether a project is trusted to whether a program lies inside it, is then
+--- made on the spelling.
 ---@param start string
 ---@return string
 function M.root(start)
   local found = vim.fs.find(M.root_markers, { path = start, upward = true })[1]
-  return found and vim.fs.dirname(found) or start
+  local root = found and vim.fs.dirname(found) or start
+  return vim.uv.fs_realpath(root) or root
 end
 
 --- Look for an executable inside the project, before falling back to PATH.
@@ -141,7 +207,7 @@ function M.project_bin(name, start)
   local trusted = may_run_project_bin(root)
 
   for _, dir in ipairs(M.bin_dirs(root)) do
-    for _, candidate in ipairs(vim.fn.glob(root .. "/" .. dir .. "/" .. name, false, true)) do
+    for _, candidate in ipairs(M.executables_named(root, dir, name)) do
       if vim.fn.executable(candidate) == 1 then
         if not trusted then
           say_refused(root, candidate)
@@ -151,6 +217,40 @@ function M.project_bin(name, start)
       end
     end
   end
+end
+
+--- A program from PATH, unless PATH leads back into an untrusted project.
+---
+--- venv-selector activates a project's virtualenv, and activating one puts
+--- its bin directory on PATH. After that `exepath` answers with a program
+--- from the project without anything having looked in the project, which is
+--- the check this module exists to make. The same is true of direnv, of a
+--- shell that was started inside the project, and of anything else that
+--- arranges PATH before the editor starts.
+---@param name string
+---@param start? string directory to judge the project from
+---@return string the path, or "" when nothing safe answers
+function M.safe_exepath(name, start)
+  local found = vim.fn.exepath(name)
+  if found == "" then
+    return ""
+  end
+  -- Resolved for the same reason the root is: a symlinked program inside the
+  -- project is inside the project, whatever its path says. Only the decision
+  -- is made on the resolved path. What comes back is the name PATH gave,
+  -- because a version manager's shim is a symlink to the manager itself:
+  -- resolving ~/.local/share/mise/shims/julia hands back /usr/bin/mise, and
+  -- running that with Julia's arguments exits 2 before the adapter speaks.
+  local resolved = vim.uv.fs_realpath(found) or found
+
+  local root = M.root(start or vim.fn.getcwd())
+  local inside = vim.fs.relpath(root, resolved)
+  if inside and not inside:match("^%.%.") and not may_run_project_bin(root) then
+    say_refused(root, found)
+    return ""
+  end
+
+  return found
 end
 
 --- Where a server's command would come from, if anywhere.
@@ -295,23 +395,20 @@ local warned = {}
 --- be worse.
 ---@param filetype string
 --- Filetypes that no language server serves, so saying one is missing would be
---- noise rather than news. Buffers the editor makes for itself, and prose.
+--- noise rather than news.
+---
+--- Only real files are listed. A buffer the editor or a plugin made for
+--- itself is not a file: it has a buftype, and the autocmd that calls this
+--- checks for one. That covers lazy, mason, trouble, the quickfix list,
+--- help, man, checkhealth and every picker panel, which is what this list
+--- used to name one by one --- and it covers the ones nobody thought to name,
+--- which is how opening a merge conflict came to warn that nothing serves
+--- DiffviewFiles.
 ---@type string[]
 M.unserved = {
-  "checkhealth",
   "gitcommit",
   "gitrebase",
-  "help",
-  "lazy",
-  "man",
-  "mason",
-  "qf",
-  "snacks_dashboard",
-  "snacks_picker_input",
-  "snacks_picker_list",
   "text",
-  "trouble",
-  "TelescopePrompt",
 }
 
 function M.warn_missing(filetype)

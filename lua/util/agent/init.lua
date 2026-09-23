@@ -68,13 +68,15 @@ M.spend = { calls = 0, usd = 0.0 }
 --- directory is pinned here.
 ---@return string
 function M.root()
-  local markers = { ".git", "pyproject.toml", "package.json", "Cargo.toml", "go.mod" }
   local from = vim.fn.expand("%:p:h")
   if from == "" then
     from = assert(vim.uv.cwd())
   end
-  local found = vim.fs.find(markers, { upward = true, path = from })[1]
-  return found and vim.fs.dirname(found) or assert(vim.uv.cwd())
+  -- The same answer the language servers get. This had a list of five markers
+  -- of its own against util.lsp's sixteen, so a Gradle or Composer project
+  -- gave the agent one root and the servers another, and the conversation was
+  -- cached against a directory nothing else agreed on.
+  return require("util.lsp").root(from)
 end
 
 --- Where this project's conversation is remembered between editor sessions.
@@ -82,7 +84,7 @@ end
 ---@return string
 local function session_file(root)
   local dir = vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "nvim-agent")
-  vim.fn.mkdir(dir, "p")
+  require("util.private").mkdir(dir)
   return vim.fs.joinpath(dir, ("%s-%s"):format(M.config.backend, vim.fn.sha256(root):sub(1, 16)))
 end
 
@@ -108,10 +110,12 @@ end
 ---@param root string
 ---@param id string
 local function write_session(root, id)
-  local fd = io.open(session_file(root), "w")
+  local path = session_file(root)
+  local fd = io.open(path, "w")
   if fd then
     fd:write(id)
     fd:close()
+    require("util.private").narrow(path)
   end
 end
 

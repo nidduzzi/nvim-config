@@ -15,6 +15,14 @@ local M = {}
 --- Run a git command in the current repository.
 ---@param args string[]
 ---@return string[] lines, boolean ok
+--- One spelling for a directory: symlinks resolved, short names expanded,
+--- separators forward.
+---@param path string
+---@return string
+local function canonical(path)
+  return vim.fs.normalize(vim.uv.fs_realpath(path) or path)
+end
+
 local function git(args)
   local result = vim.system(vim.list_extend({ "git" }, args), { text = true }):wait()
   local lines = vim.split(result.stdout or "", "\n", { trimempty = true })
@@ -33,7 +41,12 @@ function M.list()
     return {}
   end
 
-  local cwd = vim.uv.cwd() or ""
+  -- Resolved and normalised, because the same directory is spelled several
+  -- ways. git prints forward slashes on every platform; the editor's cwd uses
+  -- the platform's separator; and Windows hands out short names, so the same
+  -- worktree is C:/Users/runneradmin/... to git and C:\Users\RUNNER~1\... to
+  -- the editor. Comparing them raw says you are standing in none of them.
+  local cwd = canonical(vim.uv.cwd() or "")
   local trees = {}
   local current = nil
 
@@ -49,6 +62,7 @@ function M.list()
 
     if key == "worktree" then
       flush()
+      value = canonical(value)
       current = {
         path = value,
         branch = "",
@@ -97,9 +111,14 @@ function M.switch(path, in_tab)
   vim.notify(vim.fn.fnamemodify(path, ":~"), vim.log.levels.INFO, { title = "Worktree" })
 
   -- Sessions, pickers and the file tree all key off the working directory, so
-  -- open the picker again rather than leaving the old root on screen.
+  -- open the picker again rather than leaving the old root on screen. Only
+  -- when there is a picker: this module is also called from a spec, where
+  -- the error arrived later as "attempt to index global 'Snacks'" from a
+  -- scheduled callback, long after the test it belonged to had passed.
   vim.schedule(function()
-    Snacks.picker.files()
+    if Snacks and Snacks.picker then
+      Snacks.picker.files()
+    end
   end)
 end
 
@@ -120,7 +139,7 @@ function M.add(branch, opts)
   end
 
   local name = branch:gsub("[/%s]", "-")
-  local path = vim.fs.dirname(root) .. "/" .. vim.fs.basename(root) .. "-" .. name
+  local path = vim.fs.joinpath(vim.fs.dirname(root), vim.fs.basename(root) .. "-" .. name)
 
   local args = { "worktree", "add" }
   if opts.new then
