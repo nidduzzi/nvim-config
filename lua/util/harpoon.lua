@@ -73,11 +73,7 @@ function M.pick()
         end
         list():remove_at(item.slot)
         picker:close()
-        vim.notify(
-          ("Unpinned %s"):format(vim.fn.fnamemodify(item.file, ":.")),
-          vim.log.levels.INFO,
-          { title = "Pinned files" }
-        )
+        vim.notify(("Unpinned %s"):format(vim.fn.fnamemodify(item.file, ":.")), vim.log.levels.INFO, { title = "Pinned files" })
         vim.schedule(M.pick)
       end,
     },

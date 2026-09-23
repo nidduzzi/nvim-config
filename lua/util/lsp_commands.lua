@@ -53,11 +53,7 @@ function M.run(entry)
 
   entry.client:exec_cmd({ command = entry.command, arguments = arguments }, { bufnr = 0 }, function(err)
     if err then
-      vim.notify(
-        ("%s\n\n%s"):format(entry.command, err.message or vim.inspect(err)),
-        vim.log.levels.ERROR,
-        { title = entry.client.name }
-      )
+      vim.notify(("%s\n\n%s"):format(entry.command, err.message or vim.inspect(err)), vim.log.levels.ERROR, { title = entry.client.name })
     end
   end)
 end
@@ -67,11 +63,7 @@ function M.pick()
   local commands = M.commands()
 
   if #commands == 0 then
-    vim.notify(
-      "No language server attached here advertises any commands.",
-      vim.log.levels.WARN,
-      { title = "Server commands" }
-    )
+    vim.notify("No language server attached here advertises any commands.", vim.log.levels.WARN, { title = "Server commands" })
     return
   end
 
@@ -126,11 +118,7 @@ function M.apply_kind(kind, label)
   local clients = vim.lsp.get_clients({ bufnr = 0, method = "textDocument/codeAction" })
 
   if #clients == 0 then
-    vim.notify(
-      ("%s\n\nNo language server here offers code actions."):format(label),
-      vim.log.levels.WARN,
-      { title = "Language servers" }
-    )
+    vim.notify(("%s\n\nNo language server here offers code actions."):format(label), vim.log.levels.WARN, { title = "Language servers" })
     return
   end
 
@@ -153,11 +141,7 @@ function M.apply_kind(kind, label)
       end
     end
 
-    vim.notify(
-      ("%s\n\nNothing attached here offers that."):format(label),
-      vim.log.levels.WARN,
-      { title = "Language servers" }
-    )
+    vim.notify(("%s\n\nNothing attached here offers that."):format(label), vim.log.levels.WARN, { title = "Language servers" })
   end)
 end
 
@@ -176,11 +160,7 @@ function M.apply_action(client, action, label)
       client:exec_cmd(command, { bufnr = 0 })
     end
 
-    vim.notify(
-      ("%s\n%s"):format(resolved.title or label, client.name),
-      vim.log.levels.INFO,
-      { title = "Language servers" }
-    )
+    vim.notify(("%s\n%s"):format(resolved.title or label, client.name), vim.log.levels.INFO, { title = "Language servers" })
   end
 
   if action.edit or action.command then

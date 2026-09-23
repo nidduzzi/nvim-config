@@ -1,0 +1,24 @@
+╭────────────── Explorer ──────────────╮│          ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗
+│                               10/TOTAL ││          ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████
+╰──────────────────────────────────────╯│          ██║     ███████║  ███╔╝  ╚████╔╝ ██║   ██║██║██╔█
+ 󰝰 fixture                              │          ██║     ██╔══██║ ███╔╝    ╚██╔╝  ╚██╗ ██╔╝██║██║╚
+ ├╴󱂷 docs                               │          ███████╗██║  ██║███████╗   ██║    ╚████╔╝ ██║██║
+ ├╴󰉋 openspec                           │          ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝     ╚═══╝  ╚═╝╚═╝
+ ├╴󰴉 src                                │
+ ├╴ README.md                          │
+ ├╴󰌠 app.py                             │
+ ├╴󰌠 broken.py                        ? │   Find File                                      <leader>f
+ ├╴󰢱 buggy.lua                        ? │
+ ├╴󰢱 lib.lua                            │   New File                                            :ene
+ └╴󰢱 messy.lua                        ? │
+                                        │   Find Text                                      <leader>s
+                                        │
+                                        │   Recent Files                                   <leader>f
+                                        │
+                                        │   Config                                         <leader>f
+                                        │
+                                        │   Restore Session                                <leader>q
+                                        │
+                                        │   What can this editor do                         <leader>
+                                        │
+ NORMAL   BRANCH    Top 1:1   HH:MM

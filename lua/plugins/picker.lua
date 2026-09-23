@@ -18,6 +18,46 @@ return {
     "folke/snacks.nvim",
     opts = {
       picker = {
+        -- Per source, because the explorer sets its own list keys and they win
+        -- over the shared ones. It binds <c-c> to tcd, which changes the tab's
+        -- working directory: pressing it to leave the explorer moved the whole
+        -- tab somewhere else and left the explorer open, and the only sign was
+        -- the item count dropping from 21 to 12.
+        --
+        -- tcd is still reachable on <c-w>, which the explorer already binds to
+        -- it, so nothing is lost.
+        sources = {
+          explorer = {
+            win = {
+              list = {
+                keys = {
+                  ["<c-c>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
+                },
+              },
+            },
+          },
+        },
+
+        -- How results are ranked.
+        --
+        -- frecency and the cwd bonus are both off by default, so a file you
+        -- open twenty times a day ranks exactly like one you have never
+        -- opened. Turning them on makes the ordering depend on your history,
+        -- which is the point: the thing you want is usually the thing you
+        -- wanted before.
+        matcher = {
+          frecency = true,
+          cwd_bonus = true,
+        },
+
+        -- The keys that exist only inside a picker. which-key cannot show
+        -- them — it needs a prefix to wait on, and these have none — and the
+        -- capability list reads global and buffer mappings, not picker ones.
+        -- So the picker says them itself, in its own footer.
+        formatters = {
+          file = { filename_first = false },
+        },
+
         -- Flags shown in the picker title. `regex` and `docs` are the two
         -- worth seeing at a glance while searching.
         toggles = {
@@ -28,6 +68,11 @@ return {
           regex = { icon = "R", value = false },
         },
         win = {
+          list = {
+            keys = {
+              ["<c-c>"] = { "close", mode = { "n", "x" }, desc = "Close whatever is open" },
+            },
+          },
           input = {
             keys = {
               -- Not <a-d> or <a-p>: those are snacks' own inspect and
@@ -36,6 +81,19 @@ return {
               ["<a-S>"] = { "search_choose_filter", mode = { "i", "n" }, desc = "Choose search scope" },
               ["<a-e>"] = { "search_by_extension", mode = { "i", "n" }, desc = "Filter by extension" },
               ["<a-G>"] = { "search_by_glob", mode = { "i", "n" }, desc = "Filter by path glob" },
+              -- snacks already builds this list from the live keymap table.
+              -- A hand-written one was the third time in this work that
+              -- writing down what could be derived went stale on contact.
+              -- It is bound here only because the built-in `?` is normal-mode
+              -- and the picker opens in insert, so nobody ever reaches it.
+              ["<a-/>"] = { "toggle_help_input", mode = { "i", "n" }, desc = "What can I press in here" },
+              ["<a-q>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
+              -- snacks binds <c-c> in the list to tcd, which changes the tab's
+              -- directory. Pressing it to leave the explorer silently moved
+              -- the whole tab somewhere else and left the explorer open — the
+              -- item count changing from 21 to 12 was the only sign.
+              ["<c-c>"] = { "close", mode = { "i", "n" }, desc = "Close whatever is open" },
+              ["<a-c>"] = { "search_ignore_case", mode = { "i", "n" }, desc = "Ignore case" },
             },
           },
         },
@@ -51,6 +109,9 @@ return {
           end,
           search_by_glob = function(picker)
             search.by_glob(picker)
+          end,
+          search_ignore_case = function(picker)
+            search.toggle_case(picker)
           end,
         },
       },

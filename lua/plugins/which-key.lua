@@ -14,6 +14,11 @@ return {
       filter = function(mapping)
         return mapping.desc ~= nil and mapping.desc ~= ""
       end,
+      spec = {
+        -- Without a name the <leader>a group shows as a bare key. "ask" rather
+        -- than "AI": the group is questions you ask, and none of it writes.
+        { "<leader>a", group = "ask an agent" },
+      },
     },
   },
 }

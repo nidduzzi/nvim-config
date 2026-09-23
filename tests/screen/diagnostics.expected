@@ -1,0 +1,24 @@
+  1   -- NOTE: used by the harness to show the Claude review.
+   1   --
+   2   -- Every function here has a defect that a reviewer should be able to point at,
+   3   -- so a review that finds nothing is a broken review rather than clean code.
+   4   local M = {}
+   5
+   6   --- Take the first n items. Holes when n is larger than the list.
+   7   function M.take(items, n)
+   8   │ local out = {}
+   9   │ for i = 1, n do
+  10   │ │ out[i] = items[i]
+  11   │ end
+────────────────────────────────────────────────────────────────────────────────────────────────────
+    PROJECT/  2
+   └╴󰢱  buggy.lua  2
+     ├╴  Need check nil. Lua Diagnostics. (need-check-nil) [28, 16]
+     └╴  Need check nil. Lua Diagnostics. (need-check-nil) [29, 3]
+
+
+
+
+
+
+ NORMAL   BRANCH   2  󰢱 buggy.lua  Top 1:1   HH:MM

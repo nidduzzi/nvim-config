@@ -1,0 +1,24 @@
+  7   -- NOTE: used by the harness to show LSP features
+   6   local M = {}
+   5
+   4   --- Add two numbers together.
+   3   ---@param a number
+   2   ---@param b number
+   1   ---@return number
+   8   function M.add(a: number, b: number) /M.add            [1/2]
+   1   │ return   function M.add(a: number, b: number)
+   2   end          -> number
+   3              ────────────────────────────────────
+   4   function    Add two numbers together.
+   5   │ return M.add(n, n)
+   6   end
+   7
+   8   return M
+
+
+
+
+
+
+
+ NORMAL   BRANCH   󰊕 M.add w  Top 1:1   HH:MM

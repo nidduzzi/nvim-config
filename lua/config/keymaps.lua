@@ -7,6 +7,11 @@
 
 local map = vim.keymap.set
 
+-- One key that closes whatever is open, because the set of close keys is not
+-- learnable: q in Trouble and Lazy, <Esc> in a picker's list but not its
+-- input, the opening key in some places, :q in others. See util/dismiss.lua.
+require("util.dismiss").setup()
+
 -- Clear the search highlight without typing a command.
 map("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 
@@ -85,3 +90,83 @@ map("n", "<leader>co", vim.lsp.buf.outgoing_calls, { desc = "Outgoing calls" })
 map("n", "<leader>?", function()
   require("util.capabilities").open()
 end, { desc = "What this editor can do" })
+
+-- A coding agent, as a consultant rather than an author.
+--
+-- Every one of these runs a CLI headless with no tools at all, so it cannot
+-- write to a file even if asked. What comes back is a finding, a hint or an
+-- explanation; turning any of it into code is typing you do. There is
+-- deliberately no key here that edits a buffer — when agentic work is actually
+-- wanted, that is a decision worth making in a terminal, not one keystroke away
+-- from reading.
+--
+-- Which agent answers is a setting. Claude Code is the default because it is
+-- the one whose lockdown has been proven here; see util/agent/backends.lua.
+map({ "n", "x" }, "<leader>ar", function()
+  require("util.agent.review").run()
+end, { desc = "Review this code, as diagnostics" })
+
+map("n", "<leader>af", function()
+  require("util.agent.review").open()
+end, { desc = "List the review findings" })
+
+map("n", "<leader>as", function()
+  require("util.agent.review").choose_scope()
+end, { desc = "Review something wider or narrower" })
+
+map("n", "<leader>ac", function()
+  require("util.agent.review").clear()
+end, { desc = "Clear the review findings" })
+
+-- The hint ladder: press again for the next rung, never for the answer.
+map({ "n", "x" }, "<leader>ah", function()
+  require("util.agent.hint").next()
+end, { desc = "Hint, one rung further each press" })
+
+map("n", "<leader>aH", function()
+  require("util.agent.hint").reset()
+end, { desc = "Start the hint ladder over" })
+
+map("n", "<leader>al", function()
+  require("util.agent.ask").lookup()
+end, { desc = "Look up a signature or argument order" })
+
+map({ "n", "x" }, "<leader>ax", function()
+  require("util.agent.ask").explain()
+end, { desc = "Explain this code, or this error" })
+
+map({ "n", "x" }, "<leader>aa", function()
+  require("util.agent.ask").ask()
+end, { desc = "Ask about this code" })
+
+map("n", "<leader>a$", function()
+  require("util.agent").report()
+end, { desc = "What the agent has cost this session" })
+
+map("n", "<leader>au", function()
+  require("util.agent").use()
+end, { desc = "Switch which agent answers" })
+
+map("n", "<leader>at", function()
+  require("util.agent").trust()
+end, { desc = "How much the agent may do" })
+
+map("n", "<leader>a+", function()
+  require("util.agent").trust(nil, 1)
+end, { desc = "Let the agent do one thing more" })
+
+map("n", "<leader>a-", function()
+  require("util.agent").trust(nil, -1)
+end, { desc = "Let the agent do one thing less" })
+
+map("n", "<leader>a?", function()
+  require("util.settings").show()
+end, { desc = "Which settings are in force, and from where" })
+
+map("n", "<leader>aq", function()
+  require("util.agent").cancel()
+end, { desc = "Stop the request in flight" })
+
+map("n", "<leader>aN", function()
+  require("util.agent").reset()
+end, { desc = "Start a new conversation here" })
