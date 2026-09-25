@@ -3,7 +3,7 @@
          ╭────── [everything] features keymaps commands <Tab> scope <a-o> by action ──────╮
          │ worktree                                                              15/TOTAL │
          │────────────────────────────────────────────────────────────────────────────────│
-         │ ● Switch worktree                 <leader>gw          Another checkout of this │
+         │ ● Worktrees                       <leader>gw          Switch to, add or remove │
          │ ● Worktree for a branch           <leader>gW          Check a branch out beside│
          │ ● Diff the working tree           <leader>gd          Side-by-side diff; the sa│
          │ ○ Close whatever is open (works   <M-q>               everywhere, i mode       │
