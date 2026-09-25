@@ -98,4 +98,74 @@ describe("the last change across a format", function()
     assert.is_truthy(tostring(err):find("formatter broke"))
     assert.same(3, dot())
   end)
+
+  -- Each case: an edit that leaves "z" at line 5, then a formatter that
+  -- rewrites the text around it. `. must land on that same "z".
+  describe("follows the edited character when the formatter", function()
+    local cases = {
+      {
+        "replaces the whole buffer and adds lines on top",
+        function(buf)
+          local l = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+          table.insert(l, 1, "-- header")
+          table.insert(l, 1, "-- header")
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, l)
+        end,
+      },
+      {
+        "splits the edited line into several",
+        function(buf)
+          vim.api.nvim_buf_set_lines(buf, 4, 5, false, { "foo(", "  bar(xz,", "  y)" })
+        end,
+      },
+      {
+        "joins lines above into the edited one",
+        function(buf)
+          vim.api.nvim_buf_set_lines(buf, 2, 5, false, { "c d foo(bar(xz, y)" })
+        end,
+      },
+      {
+        "removes characters before it",
+        function(buf)
+          vim.api.nvim_buf_set_lines(buf, 4, 5, false, { "bar(xz, y)" })
+        end,
+      },
+      {
+        "removes characters after it",
+        function(buf)
+          vim.api.nvim_buf_set_lines(buf, 4, 5, false, { "foo bar(xz, y" })
+        end,
+      },
+      {
+        "re-indents it",
+        function(buf)
+          vim.api.nvim_buf_set_lines(buf, 4, 5, false, { "    foo( bar( xz ,  y )" })
+        end,
+      },
+    }
+    for _, case in ipairs(cases) do
+      it(case[1], function()
+        local buf = scratch({ "a", "b", "c", "d", "foo(bar(x), y)", "f", "g" })
+        vim.api.nvim_win_set_cursor(0, { 5, 9 })
+        vim.cmd("normal! rz")
+        marks.preserve(buf, function()
+          case[2](buf)
+        end)
+        local pos = vim.api.nvim_buf_get_mark(0, ".")
+        local line = vim.api.nvim_buf_get_lines(buf, pos[1] - 1, pos[1], true)[1]
+        assert.same("z", line:sub(pos[2] + 1, pos[2] + 1))
+      end)
+    end
+
+    it("moves to the next line when the edited line is deleted", function()
+      local buf = scratch({ "a", "b", "c", "d", "foo(bar(x), y)", "f", "g" })
+      vim.api.nvim_win_set_cursor(0, { 5, 9 })
+      vim.cmd("normal! rz")
+      marks.preserve(buf, function()
+        vim.api.nvim_buf_set_lines(buf, 4, 5, false, {})
+      end)
+      assert.same({ 5, 0 }, vim.api.nvim_buf_get_mark(0, "."))
+      assert.same("f", vim.api.nvim_buf_get_lines(buf, 4, 5, true)[1])
+    end)
+  end)
 end)

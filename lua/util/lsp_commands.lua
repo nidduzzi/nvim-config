@@ -155,7 +155,12 @@ end
 function M.apply_action(client, action, label)
   local function carry_out(resolved)
     if resolved.edit then
-      vim.lsp.util.apply_workspace_edit(resolved.edit, client.offset_encoding)
+      -- Housekeeping (organize imports, fix all) edits near the top; `. and g;
+      -- should stay on your own last edit, as they do across a format.
+      local buf = vim.api.nvim_get_current_buf()
+      require("util.format_marks").preserve(buf, function()
+        vim.lsp.util.apply_workspace_edit(resolved.edit, client.offset_encoding)
+      end)
     end
 
     if resolved.command then

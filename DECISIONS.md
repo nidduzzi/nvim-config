@@ -2148,9 +2148,28 @@ point at the formatter's edit at the top. Neovim refuses to set `'.`
 cover it), so `util/format_marks.lua` restores it the one way Neovim
 accepts: an empty edit at the old position, undojoined into the format.
 Text is unchanged, no undo step is added (seq stays the same as without the
-fix), and the buffer is not left modified after the write. The position
-rides an extmark so it follows lines added above it -- ruff's blank line
-after imports moves the edit from 21 to 22, and the mark goes with it. It
-wraps LazyVim's format entry point, which format-on-save, `<leader>cf` and
-`:LazyFormat` share. A code action or rename moving `'.` is left alone: that
-is a change you asked for, not one made behind your back.
+fix), and the buffer is not left modified after the write. It wraps
+LazyVim's format entry point, which format-on-save, `<leader>cf` and
+`:LazyFormat` share, so it covers every formatter and language, not just
+those three.
+
+The first version carried the position on an extmark, and testing the cases
+formatters actually produce broke it: an extmark inside text the formatter
+replaces is pushed to the end of that text, so splitting the edited line in
+three put `. past all three, rewriting the line in place put it on the next
+line, and a formatter that replaces the whole buffer (many LSP servers do)
+left it past the last line and raised `Index out of bounds` inside
+format-on-save. The position is now found from the text instead: the
+buffer is diffed by line before and after, lines outside a changed hunk
+shift by what was added or removed above them, and inside a hunk the
+non-whitespace characters of both versions are diffed the same way, so the
+mark follows its own character through re-indents, splits, joins, and
+characters added or removed around it. Specs cover each of those plus a
+deleted line (the mark goes to the line that now follows); breaking the
+mapping makes seven of them fail.
+
+Organize imports and fix-all (`util/lsp_commands.apply_action`) go through
+the same guard: they are housekeeping that edits near the top, the same
+complaint as a format. Checked against ruff: imports reordered, `. stayed on
+the edit. A code action you pick from the menu or a rename is left alone:
+that is a change you asked for, and `. going there is Vim's meaning.
