@@ -30,6 +30,7 @@ describe("the worktree list", function()
       vim.fn.delete(path, "rf")
       vim.fn.delete(path .. "-feature-one", "rf")
       vim.fn.delete(path .. "-feat-slash", "rf")
+      vim.fn.delete(path .. "-fix", "rf")
     end
     made = {}
   end)
@@ -70,6 +71,21 @@ describe("the worktree list", function()
       paths[vim.fs.basename(tree.path)] = tree.branch
     end
     assert.equal("feature-one", paths[vim.fs.basename(root) .. "-feature-one"])
+  end)
+
+  it("names a worktree made from another worktree after the main checkout", function()
+    local root = open()
+    worktree.add("feature-one")
+    local main = vim.fs.basename(root)
+    assert.equal(main .. "-feature-one", vim.fs.basename(vim.fn.getcwd()))
+
+    worktree.add("fix", { new = true })
+    local names = {}
+    for _, tree in ipairs(worktree.list()) do
+      names[vim.fs.basename(tree.path)] = true
+    end
+    assert.is_true(names[main .. "-fix"])
+    assert.is_nil(names[main .. "-feature-one-fix"])
   end)
 
   it("keeps the branch name a slash would break as a directory", function()

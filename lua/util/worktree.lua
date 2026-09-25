@@ -223,11 +223,10 @@ local function carry_buffers(from, to)
 
   for buf in pairs(replaced) do
     if vim.api.nvim_buf_is_valid(buf) then
-      if Snacks and Snacks.bufdelete then
-        Snacks.bufdelete.delete({ buf = buf, force = false })
-      else
-        pcall(vim.api.nvim_buf_delete, buf, {})
-      end
+      -- Not Snacks.bufdelete: for a buffer no window shows (the windows were
+      -- swapped above) it only unloads, leaving the old tree's file listed
+      -- in the bufferline.
+      pcall(vim.api.nvim_buf_delete, buf, {})
     end
   end
 
@@ -353,7 +352,11 @@ function M.add(branch, opts)
   end
 
   local name = branch:gsub("[/%s]", "-")
-  local path = vim.fs.joinpath(vim.fs.dirname(root), vim.fs.basename(root) .. "-" .. name)
+  -- Named after the repository's own checkout, not the tree you are in, so
+  -- a worktree made from a worktree is app-fix, not app-feature-fix.
+  local main = M.list(root)[1]
+  local base = main and main.main and not main.bare and main.path or root
+  local path = vim.fs.joinpath(vim.fs.dirname(base), vim.fs.basename(base) .. "-" .. name)
 
   local args = { "worktree", "add" }
   if opts.new then
@@ -453,6 +456,20 @@ function M.prune(root)
   end
   local _, ok, stderr = git({ "worktree", "prune" }, root)
   return ok, not ok and stderr or nil
+end
+
+--- Run fn once the picker or prompt that just closed has finished closing.
+---
+--- Closing a picker puts the mode back on the next tick. Opening the next
+--- picker or prompt synchronously lets that reset land on it, so typed text
+--- runs as normal-mode commands, and a switch made from a prompt's callback
+--- leaves the file in insert mode.
+---@param fn fun()
+local function after_close(fn)
+  vim.schedule(function()
+    vim.cmd.stopinsert()
+    vim.schedule(fn)
+  end)
 end
 
 --- Confirm and remove, from the picker.
@@ -570,17 +587,23 @@ function M.pick(root)
         -- Ask what to base it on before asking what to call it. A new branch
         -- always comes off something, and answering that from memory is how
         -- you end up branching off whatever happened to be checked out.
-        M.pick_branch(function(base)
-          vim.ui.input({ prompt = ("New branch off %s: "):format(base or "HEAD") }, function(branch)
-            if branch and branch ~= "" then
-              M.add(branch, { new = true, base = base, root = root })
-            end
-          end)
-        end, root)
+        after_close(function()
+          M.pick_branch(function(base)
+            vim.ui.input({ prompt = ("New branch off %s: "):format(base or "HEAD") }, function(branch)
+              if branch and branch ~= "" then
+                after_close(function()
+                  M.add(branch, { new = true, base = base, root = root })
+                end)
+              end
+            end)
+          end, root)
+        end)
       end,
       worktree_branch = function(picker)
         picker:close()
-        M.pick_branch(nil, root)
+        after_close(function()
+          M.pick_branch(nil, root)
+        end)
       end,
       worktree_remove = function(picker, item)
         picker:close()
@@ -676,18 +699,17 @@ function M.pick_branch(on_pick, root)
         return
       end
 
-      if on_pick then
-        -- A branch that already has a worktree is a perfectly good base, so
-        -- the "taken" note is information here rather than a refusal.
-        on_pick(item.branch)
-        return
-      end
-
-      if item.taken then
-        M.switch(item.taken, { from = root })
-        return
-      end
-      M.add(item.branch, { root = root })
+      after_close(function()
+        if on_pick then
+          -- A branch that already has a worktree is a perfectly good base, so
+          -- the "taken" note is information here rather than a refusal.
+          on_pick(item.branch)
+        elseif item.taken then
+          M.switch(item.taken, { from = root })
+        else
+          M.add(item.branch, { root = root })
+        end
+      end)
     end,
   })
 end
