@@ -171,18 +171,22 @@ return {
       {
         "<leader>gw",
         function()
+          local worktree = require("util.worktree")
+          local root = worktree.root()
           require("util.git").guard(function()
-            require("util.worktree").pick()
-          end)
+            worktree.pick(root)
+          end, root)
         end,
-        desc = "Worktrees: switch",
+        desc = "Worktrees: switch, add, remove",
       },
       {
         "<leader>gW",
         function()
+          local worktree = require("util.worktree")
+          local root = worktree.root()
           require("util.git").guard(function()
-            require("util.worktree").pick_branch()
-          end)
+            worktree.pick_branch(nil, root)
+          end, root)
         end,
         desc = "Worktrees: check out a branch beside this one",
       },
