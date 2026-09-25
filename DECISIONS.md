@@ -2106,3 +2106,51 @@ inheritance: a branch can carry different code, `.gitattributes` and hooks
 from the one you trusted, so they still ask like any other project. The
 capability-menu entries for worktrees previously ran git without the trust
 guard their keys use; they now go through it.
+
+## 80. Surround, yanky's puts, hardtime hints, and `. surviving a format
+
+Four things raised after living with the rebuild for a while.
+
+**Surround and yanky's put variants were dropped by mistake.** The kickstart
+config had mini.surround on `gsa`/`gsd`/`gsr`/`gsf`/`gsF`/`gsh` and yanky's
+`]p [p ]P [P >p <p >P <P =p =P`. The rebuild's comment said LazyVim ships
+mini.surround; it does not, and neither are the put variants -- both are
+extras. `coding.mini-surround` and `coding.yanky` are imported now, with the
+old keys exactly. The custom yanky spec keeps only what differs (ring
+settings, `<c-n>`/`<c-p>`, `<leader>sy`, and the confirm that loads the
+register instead of pasting); the extra's `<leader>p` history key is kept
+beside `<leader>sy`.
+
+**hardtime.nvim, hint mode.** It suggests the one-motion way after four
+presses of the same key; nothing is blocked, mouse and arrows stay. It works
+by remapping each key it watches and replaying the normal-mode map it found
+at startup. That replay cannot reach a `<Plug>` map through noremap, and a
+remap replaces the key, so the keys yanky owns (`y p P gp gP`, the `< > =`
+prefixes of its puts, `<C-N>/<C-P>`) are taken out of hardtime's lists, and
+restrictions are normal-mode only so LazyVim's visual `gj`/`gk` survives. It
+does take over `j`/`k` in normal mode, which the collision gate reports
+against stock LazyVim; that is the point of it, and the entry for
+`tools/nvim-harness/expected-collisions.txt` goes with this change.
+Its log is local (`stdpath("log")/hardtime.nvim.log`, the hint text only).
+
+**keymaps.nvim was reviewed for usage tracking and not added.** Its
+`track_usage` does not track keymaps: it records mode transitions
+(`mode:n->i`) on ModeChanged. The mapping wrapper that would count uses
+(`create_tracker`) is defined and never called. Six commits in one day in
+January 2026, one author. Nothing leaves the machine, but it does not do the
+job. Counting real mapping use is still open.
+
+**`. and g; jumped to line 1 after a save.** Reproduced for all three
+format paths here -- stylua through conform, ruff's LSP formatting, vtsls's
+LSP formatting: edit line 20, save, and both the mark and the changelist
+point at the formatter's edit at the top. Neovim refuses to set `'.`
+(`setpos()` returns -1, `nvim_buf_set_mark()` errors, `:lockmarks` does not
+cover it), so `util/format_marks.lua` restores it the one way Neovim
+accepts: an empty edit at the old position, undojoined into the format.
+Text is unchanged, no undo step is added (seq stays the same as without the
+fix), and the buffer is not left modified after the write. The position
+rides an extmark so it follows lines added above it -- ruff's blank line
+after imports moves the edit from 21 to 22, and the mark goes with it. It
+wraps LazyVim's format entry point, which format-on-save, `<leader>cf` and
+`:LazyFormat` share. A code action or rename moving `'.` is left alone: that
+is a change you asked for, not one made behind your back.
