@@ -89,3 +89,6 @@ vim.api.nvim_create_user_command("DotfilesRevokeProject", function()
   require("util.trust_menu").forget()
   vim.notify(("%s is no longer trusted."):format(vim.fn.fnamemodify(root, ":~")), vim.log.levels.INFO, { title = "Trusted project" })
 end, { desc = "Stop letting this project run the programs it ships" })
+
+-- If lazygit removes the worktree you are standing in, offer the main checkout.
+require("util.worktree").watch_lazygit()

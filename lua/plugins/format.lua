@@ -74,6 +74,9 @@ return {
   {
     "LazyVim/LazyVim",
     opts = function()
+      -- `. and g; stay on your edit instead of the formatter's (line 1).
+      require("util.format_marks").install()
+
       vim.api.nvim_create_autocmd("FileType", {
         group = vim.api.nvim_create_augroup("autoformat-exceptions", { clear = true }),
         pattern = { "c", "cpp" },

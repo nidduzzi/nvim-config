@@ -172,12 +172,16 @@ function M.features()
       end,
     },
     {
-      name = "Switch worktree",
-      desc = "Another checkout of this repository, on another branch",
+      name = "Worktrees",
+      desc = "Switch to, add or remove another checkout of this repository",
       key = "<leader>gw",
       kind = "feature",
       run = function()
-        require("util.worktree").pick()
+        local worktree = require("util.worktree")
+        local root = worktree.root()
+        require("util.git").guard(function()
+          worktree.pick(root)
+        end, root)
       end,
     },
     {
@@ -186,7 +190,11 @@ function M.features()
       key = "<leader>gW",
       kind = "feature",
       run = function()
-        require("util.worktree").pick_branch()
+        local worktree = require("util.worktree")
+        local root = worktree.root()
+        require("util.git").guard(function()
+          worktree.pick_branch(nil, root)
+        end, root)
       end,
     },
     {
