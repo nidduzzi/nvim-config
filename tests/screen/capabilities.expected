@@ -1,7 +1,7 @@
                       ██╗      █████╗ ███████╗██╗   ██╗██╗   ██╗██╗███╗   ███╗          Z
                       ██║     ██╔══██╗╚══███╔╝╚██╗ ██╔╝██║   ██║██║████╗ ████║      Z
          ╭────── [everything] features keymaps commands <Tab> scope <a-o> by action ──────╮
-         │ worktree                                                               15/TOTAL │
+         │ worktree                                                              15/TOTAL │
          │────────────────────────────────────────────────────────────────────────────────│
          │ ● Switch worktree                 <leader>gw          Another checkout of this │
          │ ● Worktree for a branch           <leader>gW          Check a branch out beside│
