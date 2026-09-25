@@ -2068,3 +2068,41 @@ more real bugs found only once it ran for real, across four pushes:
 
 All three PRs (`nvim-config` #3/#2, `dotfiles` #2) confirmed `CLEAN` and
 green again after this. Same standing call as entry 58: merging is yours.
+
+## 79. Worktrees: one picker, taken from the file you are looking at
+
+`<leader>gw` used to list the worktrees of the editor's working directory,
+switch by changing only that directory, and never remove anything. In
+practice that meant:
+
+- A submodule or nested repository never showed its own worktrees, because
+  the working directory was usually the superproject.
+- A submodule's main checkout showed up as its git directory
+  (`.git/modules/<name>`), and picking it moved into git's internals.
+- Worktrees whose directory had been deleted were offered as switchable.
+- After a switch, the open buffers, language servers and LazyVim's root all
+  stayed on the old tree, so `<leader>ff`, the explorer and lazygit kept
+  working on it.
+
+Now the repository is found from the current buffer (by looking for
+`.git`, before anything runs git), every git call names its directory, the
+submodule entry is mapped to its checkout through `core.worktree`, and
+prunable trees are flagged. A switch moves each open file to the same path
+in the new tree, keeps unsaved buffers where they are, stops the servers
+rooted in the old tree, clears LazyVim's root cache and saves and restores
+the session per tree. The picker also adds (`<a-n>`, `<a-b>`), removes
+(`<a-d>`) and prunes (`<a-p>`).
+
+Removing was deliberately left out before, because a picker with a delete
+key will eventually delete a working copy. It is in now with the guards
+that concern asked for: the main, current and locked trees are refused
+outright, and a tree with uncommitted work needs a second, explicit
+confirmation before `--force`.
+
+Trust: a worktree created from the picker is recorded as trusted, since it
+is a checkout you just asked for of a repository you were already allowed
+to run git in. Worktrees made any other way are not trusted by
+inheritance: a branch can carry different code, `.gitattributes` and hooks
+from the one you trusted, so they still ask like any other project. The
+capability-menu entries for worktrees previously ran git without the trust
+guard their keys use; they now go through it.
