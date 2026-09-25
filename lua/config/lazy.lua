@@ -39,6 +39,13 @@ require("lazy").setup({
     -- so a project tuned for VS Code needs no second copy of its settings.
     { import = "lazyvim.plugins.extras.util.project" },
 
+    -- Surround (gsa/gsd/gsr/gsf/gsF/gsh) and yanky's put variants (]p, >p,
+    -- =p and the rest). The kickstart config had both; the rebuild dropped
+    -- them because the old comment assumed LazyVim's core shipped them. It
+    -- ships neither: each is an extra.
+    { import = "lazyvim.plugins.extras.coding.mini-surround" },
+    { import = "lazyvim.plugins.extras.coding.yanky" },
+
     { import = "plugins" },
   },
   defaults = {

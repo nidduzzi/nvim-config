@@ -1,6 +1,7 @@
 -- Editing plugins carried over from the kickstart config, minus everything
--- LazyVim already ships (gitsigns, which-key, todo-comments, mini.surround,
--- treesitter, autopairs, indent guides, neo-tree).
+-- LazyVim already ships (gitsigns, which-key, todo-comments, treesitter,
+-- autopairs, indent guides, neo-tree). mini.surround and yanky's put
+-- variants are LazyVim extras, imported in lua/config/lazy.lua.
 
 return {
   -- Yank history, so a yank three yanks ago is still reachable.
@@ -38,10 +39,10 @@ return {
       },
       highlight = { on_put = true, on_yank = true, timer = 300 },
     },
+    -- y/p/P, gp/gP, [y/]y and the put variants come from the extra. Its
+    -- <leader>p history key is kept too; <leader>sy stays because it is
+    -- where the search group lists it.
     keys = {
-      { "y", "<Plug>(YankyYank)", mode = { "n", "x" }, desc = "Yank" },
-      { "p", "<Plug>(YankyPutAfter)", mode = { "n", "x" }, desc = "Put after" },
-      { "P", "<Plug>(YankyPutBefore)", mode = { "n", "x" }, desc = "Put before" },
       { "<c-n>", "<Plug>(YankyNextEntry)", desc = "Next yank entry" },
       { "<c-p>", "<Plug>(YankyPreviousEntry)", desc = "Previous yank entry" },
       {
