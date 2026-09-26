@@ -92,3 +92,7 @@ end, { desc = "Stop letting this project run the programs it ships" })
 
 -- If lazygit removes the worktree you are standing in, offer the main checkout.
 require("util.worktree").watch_lazygit()
+
+-- How often each mapping is used, for moving the frequent ones to shorter
+-- keys. Local only; `:KeyStats` shows it, vim.g.keystats = false turns it off.
+require("util.keystats").setup()
