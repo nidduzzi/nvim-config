@@ -2173,3 +2173,56 @@ the same guard: they are housekeeping that edits near the top, the same
 complaint as a format. Checked against ruff: imports reordered, `. stayed on
 the edit. A code action you pick from the menu or a rename is left alone:
 that is a change you asked for, and `. going there is Vim's meaning.
+
+## 81. Counting which mappings are used, to move the frequent ones up
+
+The complaint was that often-used things sit several keys deep. Moving keys
+by guesswork would trade one annoyance for another, so the first step is a
+record of what is actually pressed. keymaps.nvim was reviewed for this (entry
+80) and records only mode changes, so this is written here:
+`lua/util/keystats.lua`, reported by `:KeyStats`.
+
+**What it keeps.** Mode, lhs, description, count, and the date counting
+began, in `stdpath("state")/keystats.json`. A key sequence is stored only
+when it is exactly the lhs of a mapping that exists at that moment; any
+other sequence is dropped as it goes. Keys in insert, replace, command-line
+and terminal mode are not looked at at all, and neither are keys from a
+macro, a mapping's rhs or feedkeys (on_key's `typed` is empty for those).
+Nothing is sent anywhere or run. A real tmux session typed
+`hello secret gg typed text jjjj <Space>uw` in insert mode between leader
+presses; the file held only the five leader and `]p` presses.
+
+**which-key.** It reads the keys after a trigger itself and then replays the
+whole sequence flagged as typed, so every leader mapping arrived twice
+(`<Space> u w`, then `<Space>uw`), and a bare `gg` arrived as four `g`s.
+Keys are skipped while `require("which-key.state").state` is set, the
+pending sequence is dropped when collection starts, and the replay is what
+counts. Its trigger maps (desc `which-key-trigger ...`) are not treated as
+mappings, or `g` alone would count every `gg`.
+
+**Matching.** Like Vim's: a sequence that is a whole mapping and a prefix of
+a longer one waits; the next key either extends it or the shorter one
+counts; after `timeoutlen` whatever is pending is settled. A prefix that
+fails without having been a mapping is dropped with the key that broke it,
+because Vim runs those as its own commands (`g` then `g` is `gg`, and must
+not leave a `g` waiting to become `g]`).
+
+**Cost.** About 0.5 µs per key for the matcher and mode check (10,000-key
+microbenchmark); rebuilding the lookup from nvim_get_keymap is about 1 ms
+for 457 normal-mode maps and happens at most every 5 s, or on BufEnter and
+LspAttach for buffer-local maps.
+
+**Files.** Flushed every 60 s when something changed and on VimLeavePre:
+read, add, write a temporary file, rename. Two editors add up instead of
+the last one winning, except in the moment between one's read and rename.
+A file that does not parse is renamed `.corrupt-<time>`, not deleted.
+
+**Where it runs.** It starts on UIEnter, so headless runs record nothing.
+The harness's tmux runs do attach a UI, but they use `NVIM_APPNAME=
+nvim-lazyvim`, so their counts land in that appname's state directory, not
+the one the everyday `nvim` uses.
+
+Known gaps: a key read by a plugin's own getchar prompt (surround's
+character, flash's label) is counted if it happens to be a mapping's lhs in
+that mode. The harness's `run_ex` feeds `<C-\><C-N>` as typed, which counts
+as `<C-N>` (yanky's cycle); nothing but the harness does that.
