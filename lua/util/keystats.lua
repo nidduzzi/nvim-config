@@ -207,7 +207,7 @@ local function read(path)
   local ok, data = pcall(vim.json.decode, text)
   if not ok or type(data) ~= "table" or type(data.counts) ~= "table" then
     -- Kept, not deleted, in case it is worth reading by hand.
-    os.rename(path, ("%s.corrupt-%d"):format(path, os.time()))
+    vim.uv.fs_rename(path, ("%s.corrupt-%d"):format(path, os.time()))
     return { version = 1, since = os.date("%Y-%m-%d"), counts = {} }
   end
   return data
@@ -239,7 +239,14 @@ function M.flush(path)
   local f = assert(io.open(tmp, "w"))
   f:write(vim.json.encode(data))
   f:close()
-  assert(os.rename(tmp, path))
+  -- vim.uv, not os.rename: on Windows os.rename refuses to replace an
+  -- existing file ("File exists"), so every flush after the first failed.
+  -- libuv renames over the target on every platform.
+  local ok, err = vim.uv.fs_rename(tmp, path)
+  if not ok then
+    os.remove(tmp)
+    error(err)
+  end
   delta, dirty = {}, false
 end
 
