@@ -1,40 +1,5 @@
---- Search filters for the picker.
----
---- The problem this solves: in an openspec repository most text lives in
---- `openspec/` and `docs/`, so grepping for a symbol buries the two lines of
---- code you wanted under a dozen paragraphs of prose. Excluding prose outright
---- is wrong too, because sometimes the prose is exactly what you are looking
---- for.
----
---- So the filter is a mode you switch while the picker is open, not a decision
---- you make before it. Each preset is a set of ripgrep globs. The active preset
---- shows in the picker title, and one key cycles to the next one and re-runs
---- the search against the results already on screen. See lua/plugins/picker.
----
---- A project can define its own idea of what counts as documentation in its
---- `.nvim.lua`:
----
----     vim.g.search_filters = {
----       docs = { "adr/**", "*.rst" },
----     }
----
---- and can add presets of its own:
----
----     vim.g.search_filters = {
----       presets = {
----         { name = "api only", globs = { "src/api/**" } },
----       },
----     }
-
 local M = {}
 
---- Globs treated as documentation when no project overrides them.
----
---- Markdown alone is not enough. Checked against real repositories: in Flask,
---- searching for "blueprint" hits 45 files, 17 of them in docs/ and written in
---- reStructuredText, with a changelog in CHANGES.rst at the root. Excluding
---- only docs/ and markdown leaves 28; adding the prose formats leaves 27 and
---- no code.
 M.default_docs = {
   "openspec/**",
   "docs/**",
@@ -47,7 +12,6 @@ M.default_docs = {
   "CHANGES*",
 }
 
---- Read the project's overrides, if its `.nvim.lua` set any.
 ---@return { docs?: string[], presets?: table[] }
 local function project_config()
   local config = vim.g.search_filters
@@ -59,9 +23,8 @@ function M.docs_globs()
   return project_config().docs or M.default_docs
 end
 
---- Turn a list of globs into ripgrep arguments.
 ---@param globs string[]
----@param exclude boolean true to exclude the globs, false to keep only them
+---@param exclude boolean
 ---@return string[]
 local function glob_args(globs, exclude)
   local args = {}
@@ -71,10 +34,6 @@ local function glob_args(globs, exclude)
   return args
 end
 
---- The presets, in the order they are cycled through.
----
---- `code` comes first because it is the common case: you are reading code and
---- the prose is noise.
 ---@return table[]
 function M.presets()
   local docs = M.docs_globs()
@@ -106,17 +65,6 @@ function M.preset(name)
   end
 end
 
---- Ways the same search can be run again, each one ripgrep flag.
----
---- One entry so far. It is a list rather than a function because the key, the
---- flag, the word the title gains and the message all belong to one another,
---- and `lua/plugins/picker.lua` builds the keymap and the action from it.
----
---- In order, because the title is built from the ones that are on and a title
---- that reorders itself between searches is a title nobody can read.
----
---- snacks binds `<a-r>` to its own regex toggle and `<a-p>` to its preview,
---- so a new entry here has to check the defaults before it takes a key.
 ---@type { name: string, key: string, desc: string, flag: string, label: string, on: string, off: string }[]
 M.toggles = {
   {
@@ -130,8 +78,6 @@ M.toggles = {
   },
 }
 
---- What the picker is currently doing, read back from its own arguments
---- rather than from a note kept alongside them.
 ---@param picker table
 ---@return string
 local function title_for(picker)
@@ -145,49 +91,35 @@ local function title_for(picker)
   return "Grep (" .. table.concat(parts, ", ") .. ")"
 end
 
---- Apply a preset to an open picker and search again.
----
---- A preset carries the globs only, so the flags a toggle added survive it:
---- narrowing to a glob should not quietly start caring about case again.
 ---@param picker table
 ---@param preset table
 local function apply(picker, preset)
-  local kept = {}
+  local toggle_flags_kept = {}
   for _, toggle in ipairs(M.toggles) do
     if vim.tbl_contains(picker.opts.args or {}, toggle.flag) then
-      table.insert(kept, toggle.flag)
+      table.insert(toggle_flags_kept, toggle.flag)
     end
   end
 
-  picker.opts.args = vim.list_extend(vim.deepcopy(preset.args), kept)
+  picker.opts.args = vim.list_extend(vim.deepcopy(preset.args), toggle_flags_kept)
   picker.opts.search_preset = preset.name
   picker.title = title_for(picker)
   picker:find({ refresh = true })
 end
 
---- Run something that opens a prompt of its own, without the picker closing
---- underneath it.
----
---- A snacks picker closes itself as soon as focus lands in a window that is
---- not part of it. The prompts these filters open are floats, so the picker
---- survives while one is up — but dismissing the prompt puts focus back in the
---- editor, and the picker went with it: answering the glob prompt left you on
---- the dashboard rather than in a filtered search. `auto_close` is the flag
---- that governs that behaviour.
 ---@param picker table
----@param fn fun(done: fun())
-local function keep_open(picker, fn)
-  local previous = picker.opts.auto_close
+---@param open_prompt fun(on_prompt_closed: fun())
+local function keep_open(picker, open_prompt)
+  local auto_close_before = picker.opts.auto_close
   picker.opts.auto_close = false
-  fn(function()
-    picker.opts.auto_close = previous
+  open_prompt(function()
+    picker.opts.auto_close = auto_close_before
     if not picker.closed then
       picker:focus()
     end
   end)
 end
 
---- Move to the next preset.
 ---@param picker table
 function M.cycle(picker)
   local presets = M.presets()
@@ -206,7 +138,6 @@ function M.cycle(picker)
   vim.notify(next_preset.name .. ": " .. next_preset.desc, vim.log.levels.INFO, { title = "Search filter" })
 end
 
---- Pick a preset from a list instead of cycling.
 ---@param picker table
 function M.choose(picker)
   local presets = M.presets()
@@ -215,28 +146,25 @@ function M.choose(picker)
     table.insert(labels, ("%-12s %s"):format(preset.name, preset.desc))
   end
 
-  keep_open(picker, function(done)
+  keep_open(picker, function(on_prompt_closed)
     vim.ui.select(labels, { prompt = "Search filter" }, function(_, index)
       if index then
         apply(picker, presets[index])
       end
-      done()
+      on_prompt_closed()
     end)
   end)
 end
 
---- Limit the search to one or more file extensions. Bound to `<a-e>`.
 ---@param picker table
 function M.by_extension(picker)
-  -- Offer the extensions this project actually contains. Recalling that a
-  -- repository is .ts and not .js is not work worth doing from memory.
   local recall = require("util.recall")
-  keep_open(picker, function(done)
+  keep_open(picker, function(on_prompt_closed)
     recall.input({
       kind = "extensions",
       prompt = "Extensions (comma separated)",
       suggestions = recall.extensions(),
-      on_close = done,
+      on_close = on_prompt_closed,
     }, function(input)
       if not input or input == "" then
         return
@@ -256,16 +184,15 @@ function M.by_extension(picker)
   end)
 end
 
---- Limit the search to an arbitrary path glob. Bound to `<a-G>`.
 ---@param picker table
 function M.by_glob(picker)
   local recall = require("util.recall")
-  keep_open(picker, function(done)
+  keep_open(picker, function(on_prompt_closed)
     recall.input({
       kind = "glob",
       prompt = "Path glob (! excludes)",
       suggestions = recall.top_level_globs(),
-      on_close = done,
+      on_close = on_prompt_closed,
     }, function(input)
       if not input or input == "" then
         return
@@ -283,235 +210,6 @@ function M.by_glob(picker)
   end)
 end
 
---- Rank a definition above the places that merely mention it.
----
---- Grepping a symbol in a real project buries the declaration: a name is
---- written once and used fifty times, so the uses win on weight of numbers. In
---- label-studio, `Project` matched 400 lines, 98 of them inside tests.
----
---- The first version of this carried a list of patterns — `^%s*def%s+`,
---- `^%s*class%s+`, twenty of them, plus eleven more for test paths. That is the
---- same hand-written approach that, applied to keymaps earlier, silently missed
---- two of the six keys it was meant to cover. A list like that is wrong for
---- every language nobody thought of, and nobody maintains it.
----
---- Treesitter already knows. Every grammar ships a `locals.scm` written by the
---- people who wrote the grammar, and it captures `@local.definition.*` on
---- exactly the nodes that declare something. Asking it costs 1.1ms per file,
---- measured over label-studio, and the answer is cached.
----
---- Languages whose grammar ships no locals query — rust and go, here — get no
---- opinion rather than a guess. Silence is the honest answer.
----
---- It is also more accurate than the patterns were, not merely tidier.
---- label-studio's core/mixins.py contains `def get_queryset(self):` inside the
---- Example block of a class docstring. To the grammar that is a string
---- literal, so treesitter reports no definition and the line ranks as the prose
---- it is. `^%s*def%s+` would have promoted it above the real declarations.
-
---- Definition lines per file, keyed by path and modification time so an edited
---- file is re-read and an untouched one is not.
----@type table<string, { mtime: integer, lines: table<integer, table<string, boolean>> }>
-local definition_cache = {}
-
---- How long one ranking pass may spend parsing, in milliseconds. A grep over a
---- large repository can touch hundreds of files; beyond this budget the rest
---- are ranked without an opinion rather than freezing the picker.
-M.parse_budget_ms = 120
-
-local spent_ms = 0
-
---- Reset the parsing budget. Called when a picker starts a new search.
-function M.begin_pass()
-  spent_ms = 0
-end
-
---- Forget what treesitter said about every file.
-function M.forget_definitions()
-  definition_cache = {}
-end
-
---- The lines of a file on which something is declared, according to that
---- language's own locals query.
----@param path string
----@return table<integer, table<string, boolean>>|nil nil when the language cannot say
-local function definition_lines(path)
-  local stat = vim.uv.fs_stat(path)
-  if not stat then
-    return nil
-  end
-
-  local cached = definition_cache[path]
-  if cached and cached.mtime == stat.mtime.sec then
-    return cached.lines
-  end
-
-  if spent_ms >= M.parse_budget_ms then
-    return nil
-  end
-  local started = vim.uv.hrtime()
-
-  local filetype = vim.filetype.match({ filename = path })
-  local lang = filetype and vim.treesitter.language.get_lang(filetype)
-  if not lang then
-    return nil
-  end
-
-  local ok_query, query = pcall(vim.treesitter.query.get, lang, "locals")
-  if not ok_query or not query then
-    -- The grammar ships no locals query. Nothing to say about this language.
-    return nil
-  end
-
-  local fd = io.open(path, "r")
-  if not fd then
-    return nil
-  end
-  local source = fd:read("*a")
-  fd:close()
-
-  local ok_parser, parser = pcall(vim.treesitter.get_string_parser, source, lang)
-  if not ok_parser or not parser then
-    return nil
-  end
-
-  local ok_tree, trees = pcall(parser.parse, parser)
-  if not ok_tree or not trees or not trees[1] then
-    return nil
-  end
-
-  -- Keep the name each definition declares, not merely that the line declares
-  -- something. Without it, `queryset = self.get_queryset()` ranks as a
-  -- definition — which it is, of `queryset` — while you were looking for where
-  -- `get_queryset` is declared.
-  local lines = {}
-  for id, node in query:iter_captures(trees[1]:root(), source) do
-    if query.captures[id]:match("^local%.definition") then
-      local row = node:range()
-      local name = vim.treesitter.get_node_text(node, source)
-      lines[row + 1] = lines[row + 1] or {}
-      lines[row + 1][name] = true
-    end
-  end
-
-  spent_ms = spent_ms + (vim.uv.hrtime() - started) / 1e6
-  definition_cache[path] = { mtime = stat.mtime.sec, lines = lines }
-  return lines
-end
-
---- Files a result set mentioned that have not been parsed yet.
----@type table<string, boolean>
-local pending = {}
-
---- Promote a hit that lands on a declaration.
----
---- This runs inside the finder, which libuv drives from a fast event context.
---- Almost nothing is allowed there: vim.filetype.match and the treesitter
---- query both reach into Vimscript and raise E5560, which killed the finder
---- outright and returned an empty picker with no message. So this only reads
---- the cache — a table lookup and an fs_stat, both safe — and notes the files
---- it could not answer for. `M.parse_pending` does the parsing later, on the
---- main loop.
----
---- score_mul is assigned, not multiplied. A transform may run more than once
---- on the same item, and multiplying compounds: a second pass turned 2.5 into
---- 6.2 with nothing bounding it.
----@param item table
----@return table
-function M.rank_item(item, ctx)
-  local path = item.file
-  local lnum = item.pos and item.pos[1] or item.lnum
-  if not path or not lnum then
-    return item
-  end
-
-  local stat = vim.uv.fs_stat(path)
-  local cached = definition_cache[path]
-
-  if not cached or (stat and cached.mtime ~= stat.mtime.sec) then
-    pending[path] = true
-    -- ctx carries the picker, which is the only way to ask for a re-rank once
-    -- the parsing has been done somewhere it is allowed.
-    M.parse_pending(ctx and ctx.picker)
-    return item
-  end
-
-  local declared = cached.lines[lnum]
-  if not declared then
-    return item
-  end
-
-  -- What you searched for. A definition on this line only answers your question
-  -- when it is a definition of the name you asked about.
-  local wanted = ctx and ctx.filter and ctx.filter.search or ""
-  if wanted == "" then
-    item.score_mul = 2.5
-    return item
-  end
-
-  for name in pairs(declared) do
-    if name == wanted or name:find(wanted, 1, true) then
-      item.score_mul = 2.5
-      return item
-    end
-  end
-
-  return item
-end
-
---- True while a drain is already queued, so a burst of results schedules one
---- pass rather than one per item.
-local draining = false
-
---- Parse whatever the results mentioned, then rank them again.
----
---- Hooked to the results arriving, not to the picker opening. on_show fires
---- once, when the picker appears — and in a live search that is before a
---- single character has been typed, so there are no results, nothing is
---- pending, and the parse that was supposed to happen never did. Every live
---- search came back in file order with call sites above declarations.
----
---- It passed testing because the test passed `search =` up front with
---- live = false, so results existed before on_show ran. That is not how the
---- picker is used.
----@param picker table|nil
-function M.parse_pending(picker)
-  if draining then
-    return
-  end
-
-  local paths = vim.tbl_keys(pending)
-  if #paths == 0 then
-    return
-  end
-  pending = {}
-  draining = true
-
-  -- Deferred rather than immediate: results arrive in bursts as ripgrep
-  -- streams, and parsing after each one would parse the same files repeatedly
-  -- while the list is still filling.
-  vim.defer_fn(function()
-    for _, path in ipairs(paths) do
-      definition_lines(path)
-    end
-    draining = false
-
-    -- Re-running the search re-runs the transform, which now reads the cache
-    -- and finds nothing pending, so this settles after one pass.
-    if picker and not picker.closed then
-      pcall(function()
-        picker:find({ refresh = true })
-      end)
-    end
-  end, 120)
-end
-
---- Turn one of the toggles above on, or off again.
----
---- ripgrep is given --smart-case, so a lowercase query already ignores case
---- and any capital makes it exact. That is the right default and the wrong one
---- exactly when you typed a capital and meant a name: searching `Project` will
---- not find `project`. This forces the insensitive read without retyping.
 ---@param picker table
 ---@param name string
 function M.toggle(picker, name)
@@ -546,19 +244,262 @@ function M.toggle(picker, name)
   vim.notify(was_on and toggle.off or toggle.on, vim.log.levels.INFO, { title = "Search" })
 end
 
---- Options to open a grep picker with a preset already applied.
----@param name string
+M.DEFINITION_SCORE_MUL = 2.5
+M.DRAIN_BUDGET_MS = 120
+M.DRAIN_DELAY_MS = 60
+
+---@alias search.DeclaredNames table<string, boolean>
+---@alias search.DefinitionLines table<integer, search.DeclaredNames>
+
+---@type table<string, { mtime: integer, lines: search.DefinitionLines }>
+local definitions_by_path = {}
+
+---@param path string
+---@return integer|nil
+local function modified_seconds(path)
+  local stat = vim.uv.fs_stat(path)
+  return stat and stat.mtime.sec
+end
+
+---@param path string
+---@param mtime integer
+---@return search.DefinitionLines|nil
+function M.cached_definitions(path, mtime)
+  local cached = definitions_by_path[path]
+  return cached and cached.mtime == mtime and cached.lines or nil
+end
+
+---@param path string
+---@return search.DefinitionLines
+local function parse_definition_lines(path)
+  local filetype = vim.filetype.match({ filename = path })
+  local lang = filetype and vim.treesitter.language.get_lang(filetype)
+  if not lang then
+    return {}
+  end
+
+  local has_locals_query, locals_query = pcall(vim.treesitter.query.get, lang, "locals")
+  if not has_locals_query or not locals_query then
+    return {}
+  end
+
+  local file = io.open(path, "r")
+  if not file then
+    return {}
+  end
+  local source = file:read("*a")
+  file:close()
+
+  local has_parser, parser = pcall(vim.treesitter.get_string_parser, source, lang)
+  if not has_parser or not parser then
+    return {}
+  end
+
+  local parsed, trees = pcall(parser.parse, parser)
+  if not parsed or not trees or not trees[1] then
+    return {}
+  end
+
+  local lines = {}
+  for capture_id, node in locals_query:iter_captures(trees[1]:root(), source) do
+    if locals_query.captures[capture_id]:match("^local%.definition") then
+      local row = node:range()
+      local declared_name = vim.treesitter.get_node_text(node, source)
+      lines[row + 1] = lines[row + 1] or {}
+      lines[row + 1][declared_name] = true
+    end
+  end
+  return lines
+end
+
+---@param path string
+---@param mtime integer
+---@return search.DefinitionLines
+function M.parse_definitions(path, mtime)
+  local lines = parse_definition_lines(path)
+  definitions_by_path[path] = { mtime = mtime, lines = lines }
+  return lines
+end
+
+function M.forget_definitions()
+  definitions_by_path = {}
+end
+
+---@param declared_names search.DeclaredNames|nil
+---@param searched string
+---@return boolean
+local function declares_searched_name(declared_names, searched)
+  if not declared_names then
+    return false
+  end
+  if searched == "" then
+    return true
+  end
+  for declared_name in pairs(declared_names) do
+    if declared_name:find(searched, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
+---@param item table
+---@return string|nil path, integer|nil line
+local function item_location(item)
+  return item.file, item.pos and item.pos[1] or item.lnum
+end
+
+---@param item table
+---@param lines search.DefinitionLines
+---@param searched string
+---@return number|nil
+local function definition_score_mul(item, lines, searched)
+  local _, line = item_location(item)
+  return declares_searched_name(lines[line], searched) and M.DEFINITION_SCORE_MUL or nil
+end
+
+---@class search.Ranking
+---@field budget_ms number
+---@field delay_ms number
+---@field search string|nil
+---@field pending table<string, boolean>
+---@field unranked table<string, boolean>
+---@field draining boolean
+local Ranking = {}
+Ranking.__index = Ranking
+M.Ranking = Ranking
+
+---@param opts? { budget_ms?: number, delay_ms?: number }
+---@return search.Ranking
+function Ranking.new(opts)
+  opts = opts or {}
+  return setmetatable({
+    budget_ms = opts.budget_ms or M.DRAIN_BUDGET_MS,
+    delay_ms = opts.delay_ms or M.DRAIN_DELAY_MS,
+    search = nil,
+    pending = {},
+    unranked = {},
+    draining = false,
+  }, Ranking)
+end
+
+---@param item table
+---@param ctx { picker?: table, filter?: { search?: string } }
+---@return table
+function Ranking:rank(item, ctx)
+  local searched = ctx.filter and ctx.filter.search or ""
+  if searched ~= self.search then
+    self.search = searched
+    self.unranked = {}
+  end
+
+  local path, line = item_location(item)
+  if not path or not line or self.unranked[path] then
+    return item
+  end
+
+  local mtime = modified_seconds(path)
+  if not mtime then
+    return item
+  end
+
+  local lines = M.cached_definitions(path, mtime)
+  if not lines then
+    self.pending[path] = true
+    self:schedule_drain(ctx.picker)
+    return item
+  end
+
+  item.score_mul = definition_score_mul(item, lines, searched)
+  return item
+end
+
+---@param picker table|nil
+function Ranking:schedule_drain(picker)
+  if self.draining or not picker then
+    return
+  end
+  self.draining = true
+  vim.defer_fn(function()
+    self:drain(picker)
+  end, self.delay_ms)
+end
+
+---@return table<string, boolean> parsed_paths
+function Ranking:parse_pending_within_budget()
+  local paths = vim.tbl_keys(self.pending)
+  self.pending = {}
+
+  local parsed_paths = {}
+  local spent_ms = 0
+  for _, path in ipairs(paths) do
+    local mtime = modified_seconds(path)
+    if mtime and spent_ms < self.budget_ms then
+      local started = vim.uv.hrtime()
+      M.parse_definitions(path, mtime)
+      spent_ms = spent_ms + (vim.uv.hrtime() - started) / 1e6
+      parsed_paths[path] = true
+    elseif mtime then
+      self.unranked[path] = true
+    end
+  end
+  return parsed_paths
+end
+
+---@param picker table
+---@param parsed_paths table<string, boolean>
+---@return boolean changed
+function Ranking:rescore(picker, parsed_paths)
+  local searched = picker:filter().search or ""
+  local changed = false
+  for _, item in ipairs(picker.finder.items) do
+    local path = item_location(item)
+    local mtime = parsed_paths[path] and modified_seconds(path)
+    local lines = mtime and M.cached_definitions(path, mtime)
+    if lines then
+      local score_mul = definition_score_mul(item, lines, searched)
+      if score_mul ~= item.score_mul then
+        item.score_mul = score_mul
+        changed = true
+      end
+    end
+  end
+  return changed
+end
+
+---@param picker table
+function Ranking:drain(picker)
+  local parsed_paths = self:parse_pending_within_budget()
+  self.draining = false
+  if picker.closed then
+    return
+  end
+
+  if self:rescore(picker, parsed_paths) then
+    picker.list:set_target()
+    picker.matcher.tick = picker.matcher.tick + 1
+    picker.matcher:run(picker)
+  end
+
+  if next(self.pending) then
+    self:schedule_drain(picker)
+  end
+end
+
+---@param name? string
 ---@return table
 function M.opts(name)
-  -- nil means "whatever this project or machine says", which is how a project
-  -- of mostly prose can start its searches on `all` instead of `code`.
   local preset = M.preset(name or require("util.settings").get("search_preset")) or M.presets()[1]
-  M.begin_pass()
+  local ranking = Ranking.new()
   return {
     args = preset.args,
     search_preset = preset.name,
     title = "Grep (" .. preset.name .. ")",
-    transform = M.rank_item,
+    matcher = { sort_empty = true },
+    sort = { fields = { "score:desc", "file", "idx" } },
+    transform = function(item, ctx)
+      return ranking:rank(item, ctx)
+    end,
   }
 end
 
