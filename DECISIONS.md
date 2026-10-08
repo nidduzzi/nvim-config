@@ -2227,7 +2227,22 @@ character, flash's label) is counted if it happens to be a mapping's lhs in
 that mode. The harness's `run_ex` feeds `<C-\><C-N>` as typed, which counts
 as `<C-N>` (yanky's cycle); nothing but the harness does that.
 
-## 82. Grep ranking settles once results stop arriving
+
+## 82. Markdown tables are not drawn as multi-line cells
+
+Scrolling through a markdown file with wide tables made the view jump: one
+`j` took the cursor from line 51 to 61 or 87, and the top line leapt from
+26 to 87. render-markdown.nvim 8.14.0 (a778444, pinned in lazy-lock.json at
+640a3ec on 2026-09-19) draws a row wider than the window as several virtual
+lines by default (`pipe_table.wrap`). Their height changes as the cursor
+moves through the rows, and snacks.scroll animates across them to the wrong
+place. Bisected on a copy of the file that showed it, 60 `j` presses twice
+per setup: only `pipe_table.wrap = false` or turning render-markdown off
+removed both jumps; turning off snacks.scroll, `wrap` or anti-conceal did
+not. With it off, a wide row falls back to plain soft wrap and its border
+looks ragged, and the view stays put. Set in `lua/plugins/markdown.lua`.
+
+## 83. Grep ranking settles once results stop arriving
 
 **What you saw.** In `<leader>/`, `<leader>sg` and `<leader>sw` the list kept
 emptying, refilling and reordering after you stopped typing. Measured in
@@ -2279,3 +2294,4 @@ Which files fit a drain's budget depends on how ripgrep's output arrives, so
 two separate searches for the same query can rank a large result set slightly
 differently. Queueing the leftovers instead would keep the list re-sorting for
 seconds on a big repository, which is the complaint this fixes.
+
