@@ -2227,6 +2227,7 @@ character, flash's label) is counted if it happens to be a mapping's lhs in
 that mode. The harness's `run_ex` feeds `<C-\><C-N>` as typed, which counts
 as `<C-N>` (yanky's cycle); nothing but the harness does that.
 
+
 ## 82. Markdown tables are not drawn as multi-line cells
 
 Scrolling through a markdown file with wide tables made the view jump: one
@@ -2240,3 +2241,57 @@ per setup: only `pipe_table.wrap = false` or turning render-markdown off
 removed both jumps; turning off snacks.scroll, `wrap` or anti-conceal did
 not. With it off, a wide row falls back to plain soft wrap and its border
 looks ragged, and the view stays put. Set in `lua/plugins/markdown.lua`.
+
+## 83. Grep ranking settles once results stop arriving
+
+**What you saw.** In `<leader>/`, `<leader>sg` and `<leader>sw` the list kept
+emptying, refilling and reordering after you stopped typing. Measured in
+migml/backend for `tool`: ripgrep was re-run 47 times in 6.5 seconds and the
+list never settled.
+
+**Why.** Since `dc35368` the ranking parsed the files a search touched and then
+called `picker:find({ refresh = true })` to re-sort. A refresh re-runs ripgrep
+and the transform, which was assumed to find nothing left to parse. Two cases
+broke that: a file the definition parser has no answer for (no language, no
+`locals` query, unreadable, parse failure) was never cached, and the 120 ms
+parse budget was reset only when the picker opened, so once spent every file
+stayed pending. Each refresh therefore queued another, forever.
+
+There was a second fault underneath. snacks' `grep` source does not sort when
+the matcher pattern is empty, which it always is in live grep, so `score_mul`
+never influenced the order at all; what you saw was ripgrep's multi-threaded
+output order, different on every re-run. The definition ranking had in effect
+never applied to live grep.
+
+**Now.**
+- A file the parser cannot answer for is cached with an empty answer, keyed by
+  mtime like any other.
+- Ranking state belongs to the picker that opened it (`Ranking`, created by
+  `search.opts`): pending files, files left unranked, whether a drain is
+  queued. Only the definition cache, a cache of a pure function of the file,
+  is shared.
+- Each drain parses within its own 120 ms budget. Files that do not fit stay
+  unranked for that query instead of being queued again; a new query clears
+  that. One drain runs at a time, and another is queued only if results
+  arrived during it.
+- After a drain, only items in the files just parsed are rescored. If any
+  score changed, the matcher is re-run over the items already found (its tick
+  bumped so every item is re-checked, the cursor target kept). ripgrep is
+  never re-run for ranking.
+- The grep pickers sort even with an empty pattern (`sort_empty`), by score,
+  then path, then arrival order, so the order is deterministic within a search.
+
+Measured again in migml/backend for `tool`: no ripgrep re-runs after the
+first search, the same top five for the whole 6.5 seconds, and declarations
+such as `def decision_toolset` and `tool: str` fields on top.
+
+Coupling: bumping `picker.matcher.tick` relies on snacks re-checking only
+items whose `match_tick` differs from the matcher's. There is no public call
+that re-sorts already-found items; if snacks changes that, the re-rank spec
+fails.
+
+Which files fit a drain's budget depends on how ripgrep's output arrives, so
+two separate searches for the same query can rank a large result set slightly
+differently. Queueing the leftovers instead would keep the list re-sorting for
+seconds on a big repository, which is the complaint this fixes.
+
