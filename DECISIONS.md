@@ -2305,3 +2305,21 @@ to `super-tab` in `lua/plugins/completion.lua`. LazyVim still adds snippet
 jumps and AI accepts to `<Tab>` after the preset's accept, and `<C-y>` still
 accepts. Checked by typing in a real session with the menu open: `<Tab>`
 completed `foob` to `foobarbaz`, and `<CR>` left `foob` and opened a line.
+
+## 85. The terminal floats, and two escapes that arrive together still leave it
+
+`<c-/>` and `<leader>ft` opened the terminal as a split along the bottom. They
+now open it as a float over the code. The same key hides it and brings it
+back with the shell still running. Set as snacks' terminal `win.position`, so
+every Snacks terminal floats.
+
+Snacks leaves terminal mode on two `<Esc>` presses within 200 ms, as two
+separate keys. Over ssh, or in a terminal in the browser, both escapes can
+arrive in one read. Neovim then sees `<M-Esc>`, the snacks key never fires,
+and the terminal stays in terminal mode. Reproduced in tmux with
+`escape-time 50`: escapes 120 ms apart worked, the same two escapes sent
+together did not. `<M-Esc>` in a Snacks terminal now leaves terminal mode
+too. One `<Esc>` still reaches the program. `<a-q>` and `<C-\><C-n>` also
+leave it.
+
+`s` stays flash jump. Vim's `s` is `cl` and `S` is `cc`.
