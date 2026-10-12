@@ -2295,3 +2295,13 @@ two separate searches for the same query can rank a large result set slightly
 differently. Queueing the leftovers instead would keep the list re-sorting for
 seconds on a big repository, which is the complaint this fixes.
 
+
+## 84. Tab accepts a completion, Enter is always a new line
+
+The kickstart configuration used blink.cmp's `super-tab` preset. The LazyVim
+rebuild took LazyVim's default, `enter`, so accepting moved to Enter and a
+new line typed while the menu was open picked a completion instead. Set back
+to `super-tab` in `lua/plugins/completion.lua`. LazyVim still adds snippet
+jumps and AI accepts to `<Tab>` after the preset's accept, and `<C-y>` still
+accepts. Checked by typing in a real session with the menu open: `<Tab>`
+completed `foob` to `foobarbaz`, and `<CR>` left `foob` and opened a line.
