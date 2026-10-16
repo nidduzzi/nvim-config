@@ -87,7 +87,7 @@ local function lockfile_says(root, name, version)
     return locked.integrity and "pinned in package-lock.json with an integrity hash" or "pinned in package-lock.json, no integrity hash"
   end
 
-  for _, lockfile in ipairs({ "pnpm-lock.yaml", "yarn.lock", "bun.lock" }) do
+  for _, lockfile in ipairs({ "pnpm-lock.yaml", "bun.lock" }) do
     local text = read_text(vim.fs.joinpath(root, lockfile))
     if text then
       if text:find(name .. "@" .. version, 1, true) then
@@ -95,6 +95,16 @@ local function lockfile_says(root, name, version)
       end
       return ("%s does not list %s@%s"):format(lockfile, name, version)
     end
+  end
+
+  local yarn_lock = read_text(vim.fs.joinpath(root, "yarn.lock"))
+  if yarn_lock then
+    local entry_start = yarn_lock:find('\n"?' .. vim.pesc(name) .. "@")
+    local entry = entry_start and yarn_lock:sub(entry_start, (yarn_lock:find("\n\n", entry_start, true) or #yarn_lock))
+    if entry and entry:find('version "' .. version .. '"', 1, true) then
+      return ("yarn.lock lists %s@%s"):format(name, version)
+    end
+    return ("yarn.lock does not list %s@%s"):format(name, version)
   end
   return "no lockfile"
 end
