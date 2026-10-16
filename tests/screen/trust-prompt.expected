@@ -6,13 +6,13 @@
    5   ---@param b number
    6   ---@return number
    7   fu╭─ Not trusted: PROJECT ─╮
-   8   │ │                                                                           3/TOTAL │
+   8   │ │                                                                           4/TOTAL │
    9   en│────────────────────────────────────────────────────────────────────────────────│
   10     │ 1. Trust this project: run its programs and its git                            │
   11   fu│ 2. Not now: ask again next time this project is opened                         │
   12   │ │ 3. Trust every project on this machine (writes local.lua)                      │
-  13   en╰────────────────────────────────────────────────────────────────────────────────╯
-  14
+  13   en│ 4. Show what trusting this project runs                                        │
+  14     ╰────────────────────────────────────────────────────────────────────────────────╯
   15   return M
 
 
