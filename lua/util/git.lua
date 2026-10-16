@@ -83,17 +83,22 @@ function M.say_refused(root)
   )
 end
 
---- Run `fn` when git is allowed here, and explain when it is not.
 ---@generic T
 ---@param fn fun(): T
 ---@param root? string
 ---@return T|nil
 function M.guard(fn, root)
-  if not M.allowed(root) then
-    M.say_refused(root)
+  if M.allowed(root) then
+    return fn()
+  end
+
+  if require("util.settings").get("git_project") == false then
+    vim.notify("git is turned off on this machine: git_project is false.", vim.log.levels.WARN, { title = "git" })
     return nil
   end
-  return fn()
+
+  require("util.trust_menu").open(require("util.lsp").root(root or vim.fn.getcwd()))
+  return nil
 end
 
 return M
