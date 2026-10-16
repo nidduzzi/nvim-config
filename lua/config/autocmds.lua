@@ -65,10 +65,7 @@ vim.api.nvim_create_user_command("DotfilesTrustProject", function()
   local root = lsp.root(vim.fn.getcwd())
 
   trust.allow(root)
-  -- git asks once per project and remembers the answer, so it has to be told
-  -- the answer changed. Reloading the buffer is what makes gitsigns attach
-  -- without restarting the editor.
-  require("util.git").forget()
+  require("util.git").notify_permission_changed()
   require("util.trust_menu").forget()
   vim.cmd("silent! edit")
 
@@ -85,7 +82,7 @@ vim.api.nvim_create_user_command("DotfilesRevokeProject", function()
   local root = lsp.root(vim.fn.getcwd())
 
   trust.revoke(root)
-  require("util.git").forget()
+  require("util.git").notify_permission_changed()
   require("util.trust_menu").forget()
   vim.notify(("%s is no longer trusted."):format(vim.fn.fnamemodify(root, ":~")), vim.log.levels.INFO, { title = "Trusted project" })
 end, { desc = "Stop letting this project run the programs it ships" })

@@ -22,14 +22,13 @@ function M.forget()
   asked = {}
 end
 
---- Is this a project at all?
----
---- A single file opened from somewhere unrelated has no project to trust, and
---- asking about a directory is noise.
 ---@param root string
 ---@return boolean
-local function is_project(root)
-  return vim.uv.fs_stat(vim.fs.joinpath(root, ".git")) ~= nil
+local function has_something_to_trust(root)
+  if not vim.uv.fs_stat(vim.fs.joinpath(root, ".git")) then
+    return false
+  end
+  return #require("util.lsp").bin_dirs(root) > 0 or not require("util.git_repository").names_no_programs(root)
 end
 
 --- What the machine-local settings file would need, written as Lua.
@@ -69,16 +68,12 @@ local function always_run_git(path)
   return existing
 end
 
---- The menu. Shown by the prompt and by the key, with the same choices.
 ---@param root string
 function M.open(root)
   local trust = require("util.trust")
   local git = require("util.git")
   local private = require("util.private")
 
-  -- The menu explains the refusal better than the notification does, so the
-  -- notification stays quiet for this project.
-  git.mark_explained(root)
 
   local trusted = trust.is_trusted(root)
   local where = vim.fn.fnamemodify(root, ":~")
@@ -91,7 +86,7 @@ function M.open(root)
       label = "Stop trusting this project",
       run = function()
         trust.revoke(root)
-        git.forget()
+        git.notify_permission_changed()
         M.forget()
         vim.notify(("%s is no longer trusted."):format(where), vim.log.levels.INFO, { title = "Trust" })
       end,
@@ -101,7 +96,7 @@ function M.open(root)
       label = "Trust this project: run its programs and its git",
       run = function()
         trust.allow(root)
-        git.forget()
+        git.notify_permission_changed()
         M.forget()
         vim.cmd("silent! edit")
         vim.notify(
@@ -121,7 +116,7 @@ function M.open(root)
         local path = require("util.settings").local_file()
         private.writefile(path, always_run_git(path))
         require("util.settings").reload()
-        git.forget()
+        git.notify_permission_changed()
         M.forget()
         vim.cmd("silent! edit")
         vim.notify(
@@ -132,6 +127,13 @@ function M.open(root)
       end,
     }
   end
+
+  choices[#choices + 1] = {
+    label = "Show what trusting this project runs",
+    run = function()
+      require("util.trust_report").open(root)
+    end,
+  }
 
   local labels = {}
   for index, choice in ipairs(choices) do
@@ -158,7 +160,7 @@ function M.ask_if_untrusted(root)
   end
 
   root = require("util.lsp").root(root or vim.fn.getcwd())
-  if asked[root] or not is_project(root) or require("util.trust").is_trusted(root) then
+  if asked[root] or not has_something_to_trust(root) or require("util.trust").is_trusted(root) then
     return
   end
   asked[root] = true
