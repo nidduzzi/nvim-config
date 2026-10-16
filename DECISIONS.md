@@ -2323,3 +2323,41 @@ too. One `<Esc>` still reaches the program. `<a-q>` and `<C-\><C-n>` also
 leave it.
 
 `s` stays flash jump. Vim's `s` is `cl` and `S` is `cc`.
+
+## 94. Lowercase keys act on the working directory, uppercase on the file's project
+
+LazyVim pairs each finding key with a shifted twin: lowercase for the root of
+the file you are in, uppercase for the working directory. In a repository
+with subprojects that is backwards for how it is used here. In migml the root
+of a file under `backend/` is `backend/` (a submodule with its own
+`pyproject.toml` and language server root), while the working directory is
+the worktree `<leader>gw` switched to. Searching the whole worktree, the
+common case, needed Shift.
+
+Swapped, for every pair:
+
+| Keys | Lowercase (cwd) | Uppercase (project root) |
+| --- | --- | --- |
+| `<leader>ff` / `fF` | find files | find files |
+| `<leader>sg` / `sG` | grep (`<a-s>` cycles the filter) | grep, same filter keys |
+| `<leader>sw` / `sW` | grep word or selection | grep word or selection |
+| `<leader>fe` / `fE`, `<leader>e` / `E` | explorer | explorer |
+| `<leader>ft` / `fT` | terminal | terminal |
+| `<leader>gg` / `gG` | lazygit | lazygit (the root's git top) |
+
+`<leader>/` and `<c-/>` have no twin and follow lowercase: cwd. `<c-/>` and
+`<leader>ft` open the same terminal. Both lazygit keys go through
+`util.git.guard`, like the other git keys. `<leader>fr` / `fR` are not a
+root/cwd pair (all recent files / recent files under cwd) and are unchanged.
+
+The uppercase greps now pass the root as the picker's `cwd`, so results come
+back relative to it. The definition ranking opened `item.file` as given,
+which resolved against the editor's directory and silently ranked nothing
+for a search run anywhere else. It now joins `item.cwd` first.
+
+Checked by driving the keys in a scratch repository whose `backend/` is a
+nested repository, with `backend/app.py` open and the editor in the
+repository root: lowercase file, grep, word and explorer pickers listed the
+whole repository and uppercase only `backend/`; `pwd` in the `<leader>ft`
+terminal printed the repository and in `<leader>fT` `backend`; `<c-/>`
+reused the `<leader>ft` terminal rather than opening a third.
