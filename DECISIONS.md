@@ -2323,3 +2323,30 @@ too. One `<Esc>` still reaches the program. `<a-q>` and `<C-\><C-n>` also
 leave it.
 
 `s` stays flash jump. Vim's `s` is `cl` and `S` is `cc`.
+
+## 87. A git key in an untrusted project asks, every time
+
+Every git key goes through `util.git.guard`. In an untrusted project it used
+to show the refusal notification once, and the trust menu marks the project
+as already told the moment it opens. So after "Not now" or Esc on the menu,
+`<leader>gw`, `gW`, `gs`, `gl`, `gL`, `gb`, `gf` and `gm` did nothing at all
+in that project, with no message. Worktrees made outside `<leader>gw` (by
+lazygit, Claude Code or a shell) are untrusted, so this showed up as
+`<leader>gw` going missing after switching worktrees for a while.
+
+A key press is a request, so a refused one now opens the trust menu every
+time. The once-per-project notification stays for the passive callers,
+gitsigns attaching and lazygit opening. With `git_project = false` there is
+nothing to trust, so the key says git is turned off instead.
+
+## 88. Trust survives a reboot
+
+A trusted project was recorded with its device number, inode and creation
+time. The device number of an NVMe partition is handed out at boot and is
+not stable: this machine's store held three different ones (66309, 66313,
+66315) for the same ext4 partition, so a project trusted before a reboot
+could read as untrusted after it. The device number is dropped. Inode and
+creation time to the nanosecond, under the same canonical path, still tell
+a directory made again at a trusted path from the one that was trusted.
+Entries already in the store are read without their device number, so they
+count again without being re-trusted.

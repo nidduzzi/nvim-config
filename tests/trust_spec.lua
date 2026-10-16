@@ -47,6 +47,22 @@ describe("trusting a project to run its own programs", function()
     assert.is_false(trust.is_trusted(root))
   end)
 
+  it("still trusts a project after a reboot renumbers its disk", function()
+    local stat = assert(vim.uv.fs_stat(vim.uv.fs_realpath(root)))
+    local born = stat.birthtime or stat.ctime
+    local recorded_before_reboot = ("%d:%d:%d.%d"):format(stat.dev + 6, stat.ino, born.sec, born.nsec)
+    vim.fn.mkdir(vim.fs.dirname(trust.store()), "p")
+    vim.fn.writefile({ vim.uv.fs_realpath(root) .. "\t" .. recorded_before_reboot }, trust.store(), "a")
+    assert.is_true(trust.is_trusted(root))
+  end)
+
+  it("does not trust a directory made again at a trusted path", function()
+    trust.allow(root)
+    vim.fn.delete(root, "rf")
+    vim.fn.mkdir(root, "p")
+    assert.is_false(trust.is_trusted(root))
+  end)
+
   it("refuses a project binary by default", function()
     assert.is_nil(require("util.lsp").project_bin("ruff", root))
   end)
