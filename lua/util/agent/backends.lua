@@ -160,32 +160,16 @@ function M.step(rung, by)
   return M.rungs[1]
 end
 
---- Claude Code.
----
---- The strongest guarantee of the three, because it is the only one that can
---- be checked without asking the model. `--tools ""` empties the built-in set
---- and
---- `--strict-mcp-config` drops the MCP servers, which `--tools ""` leaves
---- behind: without it Claude still had Drive, browser and codegraph. Under both
---- flags the CLI's startup event reports `tools=[] mcp_servers=[]`, and the
---- canary file survives.
----
---- Do not ask the model instead. Asked to list its tools it named Write, Edit,
---- NotebookEdit and Bash while holding none of them, and asked to write it
---- produced fabricated tool-call markup. The registry is the witness.
 ---@type agent.Backend
 M.claude = {
   cmd = "claude",
   label = "Claude Code",
-  lockdown = { "--tools", "", "--strict-mcp-config" },
-  -- `--strict-mcp-config` on every rung, because `--tools` does not drop the
-  -- MCP servers: without it Claude kept Drive, browser and codegraph whatever
-  -- the built-in set was narrowed to.
+  lockdown = { "--tools", "", "--strict-mcp-config", "--setting-sources", "user" },
   rungs = {
-    chat = { "--tools", "", "--strict-mcp-config" },
-    context = { "--tools", "", "--strict-mcp-config" },
-    explore = { "--tools", "Read,Grep,Glob", "--strict-mcp-config" },
-    edit = { "--tools", "Read,Grep,Glob,Edit,Write", "--strict-mcp-config" },
+    chat = { "--tools", "", "--strict-mcp-config", "--setting-sources", "user" },
+    context = { "--tools", "", "--strict-mcp-config", "--setting-sources", "user" },
+    explore = { "--tools", "Read,Grep,Glob", "--strict-mcp-config", "--setting-sources", "user" },
+    edit = { "--tools", "Read,Grep,Glob,Edit,Write", "--strict-mcp-config", "--setting-sources", "user" },
   },
   rung_proof = {
     chat = "startup registry reports tools=[] mcp_servers=[]",

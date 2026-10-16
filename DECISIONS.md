@@ -2514,3 +2514,19 @@ repository root: lowercase file, grep, word and explorer pickers listed the
 whole repository and uppercase only `backend/`; `pwd` in the `<leader>ft`
 terminal printed the repository and in `<leader>fT` `backend`; `<c-/>`
 reused the `<leader>ft` terminal rather than opening a third.
+
+## 95. The agent never loads a project's own Claude settings
+
+Every rung ran `claude` with `--tools` and `--strict-mcp-config`, and the
+startup registry proved the tools were gone. It did not cover settings. A
+repository's `.claude/settings.json` can declare hooks, and hooks are shell
+commands. Checked in a scratch repository with a `SessionStart` and a
+`UserPromptSubmit` hook that each touch a file: `claude -p --tools ""
+--strict-mcp-config` ran both. So asking the chat rung a question in an
+untrusted project ran a command that project chose.
+
+Every rung now adds `--setting-sources user`. Your own settings and hooks
+still load; the project's and its `settings.local.json` do not. Checked the
+same way: neither hook ran, and the registry still reported `tools=[]
+mcp_servers=[]`. The `normal` rung passes no flags and loads everything, as
+before.

@@ -34,17 +34,24 @@ end)
 describe("claude's rungs", function()
   it("empties the registry on chat and context", function()
     for _, rung in ipairs({ "chat", "context" }) do
-      assert.are.same({ "--tools", "", "--strict-mcp-config" }, backends.claude.rungs[rung])
+      assert.are.same({ "--tools", "", "--strict-mcp-config", "--setting-sources", "user" }, backends.claude.rungs[rung])
+    end
+  end)
+
+  it("never loads the project's own Claude settings, whose hooks run commands", function()
+    for rung, flags in pairs(backends.claude.rungs) do
+      local joined = table.concat(flags, " ")
+      assert.is_truthy(joined:find("--setting-sources user", 1, true), rung .. " loads project settings")
     end
   end)
 
   it("names exactly the reading tools on explore", function()
-    assert.are.same({ "--tools", "Read,Grep,Glob", "--strict-mcp-config" }, backends.claude.rungs.explore)
+    assert.are.same({ "--tools", "Read,Grep,Glob", "--strict-mcp-config", "--setting-sources", "user" }, backends.claude.rungs.explore)
   end)
 
   it("adds writing but never a shell on edit", function()
     local flags = backends.claude.rungs.edit
-    assert.are.same({ "--tools", "Read,Grep,Glob,Edit,Write", "--strict-mcp-config" }, flags)
+    assert.are.same({ "--tools", "Read,Grep,Glob,Edit,Write", "--strict-mcp-config", "--setting-sources", "user" }, flags)
     assert.is_falsy(table.concat(flags, " "):find("Bash"))
   end)
 
@@ -86,7 +93,7 @@ end)
 describe("the terminal", function()
   it("runs the same flags as the headless path", function()
     local cmd = backends.terminal_cmd(backends.claude, "explore")
-    assert.are.same({ "claude", "--tools", "Read,Grep,Glob", "--strict-mcp-config" }, cmd)
+    assert.are.same({ "claude", "--tools", "Read,Grep,Glob", "--strict-mcp-config", "--setting-sources", "user" }, cmd)
   end)
 
   it("withdraws the promise on the top rung", function()
