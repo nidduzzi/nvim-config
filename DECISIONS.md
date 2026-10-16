@@ -2323,3 +2323,19 @@ too. One `<Esc>` still reaches the program. `<a-q>` and `<C-\><C-n>` also
 leave it.
 
 `s` stays flash jump. Vim's `s` is `cl` and `S` is `cc`.
+
+## 89. The agent never loads a project's own Claude settings
+
+Every rung ran `claude` with `--tools` and `--strict-mcp-config`, and the
+startup registry proved the tools were gone. It did not cover settings. A
+repository's `.claude/settings.json` can declare hooks, and hooks are shell
+commands. Checked in a scratch repository with a `SessionStart` and a
+`UserPromptSubmit` hook that each touch a file: `claude -p --tools ""
+--strict-mcp-config` ran both. So asking the chat rung a question in an
+untrusted project ran a command that project chose.
+
+Every rung now adds `--setting-sources user`. Your own settings and hooks
+still load; the project's and its `settings.local.json` do not. Checked the
+same way: neither hook ran, and the registry still reported `tools=[]
+mcp_servers=[]`. The `normal` rung passes no flags and loads everything, as
+before.
