@@ -11,15 +11,17 @@
 
 local M = {}
 
---- Where a version manager keeps the interpreters it installed, relative to
---- the home directory. Globs, because each keeps one directory per version.
----@type string[]
-M.managed = {
-  ".local/share/mise/installs/python/*/bin/python3",
-  ".local/share/uv/python/*/bin/python3",
-  ".pyenv/versions/*/bin/python3",
-  ".asdf/installs/python/*/bin/python3",
-}
+---@return string[]
+function M.managed_patterns()
+  local home = vim.env.HOME or ""
+  local data_home = vim.env.XDG_DATA_HOME or vim.fs.joinpath(home, ".local", "share")
+  return {
+    vim.fs.joinpath(vim.env.MISE_DATA_DIR or vim.fs.joinpath(data_home, "mise"), "installs", "python", "*", "bin", "python3"),
+    vim.fs.joinpath(vim.env.UV_PYTHON_INSTALL_DIR or vim.fs.joinpath(data_home, "uv", "python"), "*", "bin", "python3"),
+    vim.fs.joinpath(vim.env.PYENV_ROOT or vim.fs.joinpath(home, ".pyenv"), "versions", "*", "bin", "python3"),
+    vim.fs.joinpath(vim.env.ASDF_DATA_DIR or vim.fs.joinpath(home, ".asdf"), "installs", "python", "*", "bin", "python3"),
+  }
+end
 
 --- Can this interpreter create a virtualenv?
 ---
@@ -36,13 +38,11 @@ function M.makes_venvs(python)
   return vim.v.shell_error == 0
 end
 
---- Interpreters this machine has, most recently installed first, so a version
---- manager's newest is preferred over its oldest.
 ---@return string[]
 function M.candidates()
   local found = {}
-  for _, pattern in ipairs(M.managed) do
-    local paths = vim.fn.glob(vim.fs.joinpath(vim.env.HOME or "", pattern), false, true)
+  for _, pattern in ipairs(M.managed_patterns()) do
+    local paths = vim.fn.glob(pattern, false, true)
     table.sort(paths, function(a, b)
       return a > b
     end)
@@ -66,25 +66,60 @@ function M.usable()
   end
 end
 
---- Put a Python that works ahead of one that does not.
----
---- A side effect, and the only one here: it changes what `python3` means for
---- every process the editor starts. That is the point --- Mason is not the
---- only thing that asks for python3 and then needs a virtualenv --- and it
---- happens only when the one on PATH cannot do the job.
----@return string|nil what was put in front, if anything
-function M.prefer_usable()
-  local on_path = vim.fn.exepath("python3")
-  if on_path ~= "" and M.makes_venvs(on_path) then
+---@param python string
+---@return string|nil
+function M.replacement_for(python)
+  if python ~= "" and M.makes_venvs(python) then
     return nil
   end
 
   for _, candidate in ipairs(M.candidates()) do
     if M.makes_venvs(candidate) then
-      vim.env.PATH = vim.fs.dirname(candidate) .. ":" .. (vim.env.PATH or "")
       return candidate
     end
   end
+end
+
+---@param path string
+---@param directory string
+---@return string
+function M.path_without(path, directory)
+  local entries = vim.split(path, ":", { plain = true })
+  for index, entry in ipairs(entries) do
+    if entry == directory then
+      table.remove(entries, index)
+      break
+    end
+  end
+  return table.concat(entries, ":")
+end
+
+---@param registry { on: fun(self, event: string, handler: fun(handle: { once: fun(self, event: string, handler: fun()) })) }
+function M.prefer_usable_while_installing(registry)
+  local installs_in_progress = 0
+  local prepended_directory = nil
+
+  registry:on("package:install:handle", function(handle)
+    if installs_in_progress == 0 then
+      local replacement = M.replacement_for(vim.fn.exepath("python3"))
+      prepended_directory = replacement and vim.fs.dirname(replacement)
+      if prepended_directory then
+        vim.env.PATH = prepended_directory .. ":" .. (vim.env.PATH or "")
+      end
+    end
+    installs_in_progress = installs_in_progress + 1
+
+    handle:once(
+      "closed",
+      vim.schedule_wrap(function()
+        installs_in_progress = installs_in_progress - 1
+        if installs_in_progress == 0 and prepended_directory then
+          vim.env.PATH = M.path_without(vim.env.PATH or "", prepended_directory)
+          prepended_directory = nil
+        end
+      end)
+    )
+  end)
 end
 
 return M
