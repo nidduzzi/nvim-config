@@ -93,6 +93,19 @@ describe("showing what trusting a project runs", function()
     assert.is_truthy(lines:find("package-lock.json pins 3.0.0, installed is 3.3.3", 1, true))
   end)
 
+  it("reads a yarn.lock entry for the installed version", function()
+    vim.fn.delete(vim.fs.joinpath(root, "package-lock.json"))
+    write(root, "yarn.lock", {
+      "# yarn lockfile v1",
+      "",
+      'prettier@^3.0.0:',
+      '  version "3.3.3"',
+      '  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.3.3.tgz"',
+    })
+    local lines = table.concat(report.lines(report.collect(root)), "\n")
+    assert.is_truthy(lines:find("yarn.lock lists prettier@3.3.3", 1, true))
+  end)
+
   it("runs nothing from the project to build the view", function()
     report.lines(report.collect(root))
     assert.is_nil(vim.uv.fs_stat(canary))

@@ -28,20 +28,26 @@ map("n", "<leader>gt", function()
   require("util.trust_menu").open(require("util.lsp").root(vim.fn.getcwd()))
 end, { desc = "Git: trust this project" })
 
+local function current_file_directory()
+  local name = vim.api.nvim_buf_get_name(0)
+  return name ~= "" and vim.fs.dirname(name) or vim.fn.getcwd()
+end
+
 for key, git_action in pairs({
   ["<leader>gs"] = { desc = "Git: git status", run = function() Snacks.picker.git_status() end },
   ["<leader>gl"] = { desc = "Git: git log", run = function() Snacks.picker.git_log() end },
-  ["<leader>gL"] = { desc = "Git: git log line", run = function() Snacks.picker.git_log_line() end },
-  ["<leader>gb"] = { desc = "Git: git log line", run = function() Snacks.picker.git_log_line() end },
-  ["<leader>gf"] = { desc = "Git: git log file", run = function() Snacks.picker.git_log_file() end },
+  ["<leader>gL"] = { desc = "Git: git log line", root = current_file_directory, run = function() Snacks.picker.git_log_line() end },
+  ["<leader>gb"] = { desc = "Git: git log line", root = current_file_directory, run = function() Snacks.picker.git_log_line() end },
+  ["<leader>gf"] = { desc = "Git: git log file", root = current_file_directory, run = function() Snacks.picker.git_log_file() end },
   ["<leader>gD"] = { desc = "Git: diff against origin", run = function() Snacks.picker.git_diff({ base = "origin", group = true }) end },
   ["<leader>gS"] = { desc = "Git: stash", run = function() Snacks.picker.git_stash() end },
   ["<leader>fg"] = { desc = "Find files (git-files)", run = function() Snacks.picker.git_files() end },
-  ["<leader>gg"] = { desc = "Lazygit (root dir)", run = function() Snacks.lazygit({ cwd = LazyVim.root.git() }) end },
+  ["<leader>gg"] = { desc = "Lazygit (root dir)", root = LazyVim.root.git, run = function() Snacks.lazygit({ cwd = LazyVim.root.git() }) end },
   ["<leader>gG"] = { desc = "Lazygit (cwd)", run = function() Snacks.lazygit() end },
-  ["<leader>gB"] = { modes = { "n", "x" }, desc = "Git: browse (open)", run = function() Snacks.gitbrowse() end },
+  ["<leader>gB"] = { modes = { "n", "x" }, desc = "Git: browse (open)", root = current_file_directory, run = function() Snacks.gitbrowse() end },
   ["<leader>gY"] = {
     modes = { "n", "x" },
+    root = current_file_directory,
     desc = "Git: browse (copy URL)",
     run = function()
       Snacks.gitbrowse({
@@ -54,7 +60,7 @@ for key, git_action in pairs({
   },
 }) do
   map(git_action.modes or "n", key, function()
-    require("util.git").guard(git_action.run)
+    require("util.git").guard(git_action.run, git_action.root and git_action.root())
   end, { desc = git_action.desc })
 end
 
