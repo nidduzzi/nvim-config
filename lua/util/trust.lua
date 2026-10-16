@@ -5,18 +5,6 @@ function M.store()
   return vim.fs.joinpath(vim.fn.stdpath("state") --[[@as string]], "trusted-projects")
 end
 
---- The directory's identity, as the filesystem knows it.
----
---- A path is not one: /tmp/work can be deleted and made again by something
---- else, and a store that remembers only the path would hand that new
---- directory the trust you gave the old one --- which, here, means running
---- programs out of it.
----
---- The inode alone is not enough. A directory deleted and immediately made
---- again is routinely given the same one back, which is what happened the
---- first time this was written: the spec that deletes and recreates a
---- directory still read as trusted. Creation time separates them --- the two
---- differ by a millisecond there, and nanoseconds are recorded.
 ---@param path string
 ---@return string|nil
 local function identity(path)
@@ -25,14 +13,15 @@ local function identity(path)
     return nil
   end
   local born = stat.birthtime or stat.ctime
-  return ("%d:%d:%d.%d"):format(stat.dev, stat.ino, born.sec, born.nsec)
+  return ("%d:%d.%d"):format(stat.ino, born.sec, born.nsec)
 end
 
---- Trusted roots, as path to the identity recorded with it.
----
---- A line is `path\tidentity`. A line with no identity is from an older
---- store: it is dropped rather than honoured, so the question is asked once
---- more and answered with something checkable.
+---@param recorded string
+---@return string
+local function without_boot_dependent_device(recorded)
+  return recorded:match("^%d+:(%d+:%d+%.%d+)$") or recorded
+end
+
 ---@return table<string, string>
 local function read_store()
   local trusted = {}
@@ -41,7 +30,7 @@ local function read_store()
     for _, line in ipairs(vim.fn.readfile(path)) do
       local root, recorded = line:match("^(.-)\t(.+)$")
       if root and vim.trim(root) ~= "" and not root:match("^#") then
-        trusted[vim.trim(root)] = vim.trim(recorded)
+        trusted[vim.trim(root)] = without_boot_dependent_device(vim.trim(recorded))
       end
     end
   end

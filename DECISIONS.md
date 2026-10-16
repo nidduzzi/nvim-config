@@ -2345,6 +2345,7 @@ Where to look is each version manager's default install directory, or the
 one its own variable names: `MISE_DATA_DIR`, `UV_PYTHON_INSTALL_DIR`,
 `PYENV_ROOT`, `ASDF_DATA_DIR`, with `XDG_DATA_HOME` for the defaults that
 live under it. Nothing about one machine's layout is written down.
+
 ## 87. A git key in an untrusted project asks, every time
 
 Every git key goes through `util.git.guard`. In an untrusted project it used
@@ -2359,3 +2360,15 @@ A key press is a request, so a refused one now opens the trust menu every
 time. The once-per-project notification stays for the passive callers,
 gitsigns attaching and lazygit opening. With `git_project = false` there is
 nothing to trust, so the key says git is turned off instead.
+
+## 88. Trust survives a reboot
+
+A trusted project was recorded with its device number, inode and creation
+time. The device number of an NVMe partition is handed out at boot and is
+not stable: this machine's store held three different ones (66309, 66313,
+66315) for the same ext4 partition, so a project trusted before a reboot
+could read as untrusted after it. The device number is dropped. Inode and
+creation time to the nanosecond, under the same canonical path, still tell
+a directory made again at a trusted path from the one that was trusted.
+Entries already in the store are read without their device number, so they
+count again without being re-trusted.
