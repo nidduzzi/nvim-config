@@ -28,21 +28,34 @@ map("n", "<leader>gt", function()
   require("util.trust_menu").open(require("util.lsp").root(vim.fn.getcwd()))
 end, { desc = "Git: trust this project" })
 
--- The git pickers are LazyVim's, and they run git. Rebound here so an
--- untrusted project gets the refusal rather than the repository's own
--- programs. See util/git.lua.
-for key, picker in pairs({
-  ["<leader>gs"] = "git_status",
-  ["<leader>gl"] = "git_log",
-  ["<leader>gL"] = "git_log_line",
-  ["<leader>gb"] = "git_log_line",
-  ["<leader>gf"] = "git_log_file",
+for key, git_action in pairs({
+  ["<leader>gs"] = { desc = "Git: git status", run = function() Snacks.picker.git_status() end },
+  ["<leader>gl"] = { desc = "Git: git log", run = function() Snacks.picker.git_log() end },
+  ["<leader>gL"] = { desc = "Git: git log line", run = function() Snacks.picker.git_log_line() end },
+  ["<leader>gb"] = { desc = "Git: git log line", run = function() Snacks.picker.git_log_line() end },
+  ["<leader>gf"] = { desc = "Git: git log file", run = function() Snacks.picker.git_log_file() end },
+  ["<leader>gD"] = { desc = "Git: diff against origin", run = function() Snacks.picker.git_diff({ base = "origin", group = true }) end },
+  ["<leader>gS"] = { desc = "Git: stash", run = function() Snacks.picker.git_stash() end },
+  ["<leader>fg"] = { desc = "Find files (git-files)", run = function() Snacks.picker.git_files() end },
+  ["<leader>gg"] = { desc = "Lazygit (root dir)", run = function() Snacks.lazygit({ cwd = LazyVim.root.git() }) end },
+  ["<leader>gG"] = { desc = "Lazygit (cwd)", run = function() Snacks.lazygit() end },
+  ["<leader>gB"] = { modes = { "n", "x" }, desc = "Git: browse (open)", run = function() Snacks.gitbrowse() end },
+  ["<leader>gY"] = {
+    modes = { "n", "x" },
+    desc = "Git: browse (copy URL)",
+    run = function()
+      Snacks.gitbrowse({
+        open = function(url)
+          vim.fn.setreg("+", url)
+        end,
+        notify = false,
+      })
+    end,
+  },
 }) do
-  map("n", key, function()
-    require("util.git").guard(function()
-      Snacks.picker[picker]()
-    end)
-  end, { desc = "Git: " .. picker:gsub("_", " ") })
+  map(git_action.modes or "n", key, function()
+    require("util.git").guard(git_action.run)
+  end, { desc = git_action.desc })
 end
 
 -- Watch the keys this config depends on. Something taking one of these means a

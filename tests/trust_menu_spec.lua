@@ -6,6 +6,7 @@ local settings = require("util.settings")
 local function repository()
   local root = vim.fn.tempname()
   vim.fn.mkdir(vim.fs.joinpath(root, ".git"), "p")
+  vim.fn.writefile({ "[core]", "\tpager = cat" }, vim.fs.joinpath(root, ".git", "config"))
   return root
 end
 
@@ -22,7 +23,6 @@ describe("asking about a project", function()
       asked[#asked + 1] = { items = items, prompt = opts and opts.prompt }
     end
     menu.forget()
-    require("util.git").forget()
   end)
 
   after_each(function()
@@ -30,7 +30,6 @@ describe("asking about a project", function()
     trust.revoke(root)
     settings.clear("git_project")
     menu.forget()
-    require("util.git").forget()
     vim.fn.delete(root, "rf")
   end)
 
@@ -46,7 +45,6 @@ describe("asking about a project", function()
 
   it("says nothing about a project that is already trusted", function()
     trust.allow(root)
-    require("util.git").forget()
 
     menu.ask_if_untrusted(root)
     vim.wait(2500)
@@ -84,9 +82,10 @@ describe("asking about a project", function()
 
   it("offers trusting, waiting, and never asking on this machine", function()
     menu.open(root)
-    assert.equal(3, #asked[1].items)
+    assert.equal(4, #asked[1].items)
     assert.is_truthy(asked[1].items[1]:match("Trust this project"))
     assert.is_truthy(asked[1].items[3]:match("every project on this machine"))
+    assert.is_truthy(asked[1].items[4]:match("Show what trusting this project runs"))
   end)
 
   it("writes the machine-wide answer into local.lua", function()
@@ -138,23 +137,37 @@ describe("asking about a project", function()
     settings.reload()
   end)
 
+  it("does not ask about a repository whose git config names no programs and that ships none", function()
+    vim.fn.writefile({ "[core]", "\tbare = false" }, vim.fs.joinpath(root, ".git", "config"))
+    menu.ask_if_untrusted(root)
+    vim.wait(500)
+    assert.equal(0, #asked)
+  end)
+
+  it("asks about a harmless repository that ships its own programs", function()
+    vim.fn.writefile({ "[core]", "\tbare = false" }, vim.fs.joinpath(root, ".git", "config"))
+    vim.fn.mkdir(vim.fs.joinpath(root, ".venv", "bin"), "p")
+    vim.fn.writefile({ "home = /usr/bin" }, vim.fs.joinpath(root, ".venv", "pyvenv.cfg"))
+    menu.ask_if_untrusted(root)
+    vim.wait(2500, function()
+      return #asked > 0
+    end)
+    assert.equal(1, #asked)
+  end)
+
   it("offers untrusting a project that is trusted", function()
     trust.allow(root)
     menu.open(root)
 
-    assert.equal(1, #asked[1].items)
+    assert.equal(2, #asked[1].items)
     assert.is_truthy(asked[1].items[1]:match("Stop trusting"))
+    assert.is_truthy(asked[1].items[2]:match("Show what trusting this project runs"))
   end)
 end)
 
 describe("arriving in a project by changing directory", function()
   it("asks about the directory moved into, not its parent", function()
-    -- DirChanged reports the new directory; BufReadPost reports a file. The
-    -- handler took the parent of both, so changing into a project asked about
-    -- the directory above it -- which is rarely a project, so it asked
-    -- nothing at all.
-    local root = vim.fn.tempname()
-    vim.fn.mkdir(vim.fs.joinpath(root, ".git"), "p")
+    local root = repository()
 
     local asked = {}
     local previous = vim.ui.select

@@ -1,13 +1,9 @@
 local recall = require("util.recall")
 local trust = require("util.trust")
 
---- git is only run in a project that has been trusted, so a spec about what
---- git reports has to say so. An untrusted project is answered by ripgrep,
---- which reads the same ignore files but does not know what is tracked.
 ---@param root string
 local function trusted(root)
   trust.allow(root)
-  require("util.git").forget()
 end
 
 local function project(files, as_git_repo)
@@ -45,7 +41,6 @@ describe("the extensions a project contains", function()
       trust.revoke(root)
       vim.fn.delete(root, "rf")
     end
-    require("util.git").forget()
     roots = {}
     recall.rescan()
   end)
@@ -70,8 +65,9 @@ describe("the extensions a project contains", function()
     assert.are.same({ "py" }, recall.extensions(5))
   end)
 
-  it("uses ripgrep in a repository nobody has vouched for, so untracked files count", function()
+  it("uses ripgrep in an untrusted repository whose git config names a program, so untracked files count", function()
     local root = make({ "tracked.py" }, true)
+    vim.fn.system({ "git", "-C", root, "config", "core.pager", "cat" })
     vim.fn.writefile({ "x" }, vim.fs.joinpath(root, "untracked.rs"))
     vim.cmd.cd(root)
     assert.are.same({ "py", "rs" }, recall.extensions(5))
