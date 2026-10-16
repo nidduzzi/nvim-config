@@ -2345,3 +2345,17 @@ Where to look is each version manager's default install directory, or the
 one its own variable names: `MISE_DATA_DIR`, `UV_PYTHON_INSTALL_DIR`,
 `PYENV_ROOT`, `ASDF_DATA_DIR`, with `XDG_DATA_HOME` for the defaults that
 live under it. Nothing about one machine's layout is written down.
+## 87. A git key in an untrusted project asks, every time
+
+Every git key goes through `util.git.guard`. In an untrusted project it used
+to show the refusal notification once, and the trust menu marks the project
+as already told the moment it opens. So after "Not now" or Esc on the menu,
+`<leader>gw`, `gW`, `gs`, `gl`, `gL`, `gb`, `gf` and `gm` did nothing at all
+in that project, with no message. Worktrees made outside `<leader>gw` (by
+lazygit, Claude Code or a shell) are untrusted, so this showed up as
+`<leader>gw` going missing after switching worktrees for a while.
+
+A key press is a request, so a refused one now opens the trust menu every
+time. The once-per-project notification stays for the passive callers,
+gitsigns attaching and lazygit opening. With `git_project = false` there is
+nothing to trust, so the key says git is turned off instead.
