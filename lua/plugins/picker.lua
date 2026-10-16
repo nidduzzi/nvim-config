@@ -41,6 +41,12 @@ return {
         -- it, so nothing is lost.
         sources = {
           explorer = {
+            config = function(opts)
+              local git_allowed = require("util.git").allowed(opts.cwd)
+              opts.git_status = opts.git_status and git_allowed
+              opts.git_untracked = opts.git_untracked and git_allowed
+              return opts
+            end,
             win = {
               list = {
                 keys = {

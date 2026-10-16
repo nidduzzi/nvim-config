@@ -2350,3 +2350,107 @@ creation time to the nanosecond, under the same canonical path, still tell
 a directory made again at a trusted path from the one that was trusted.
 Entries already in the store are read without their device number, so they
 count again without being re-trusted.
+
+## 90. Nothing runs git in a project git is not allowed in
+
+Checked with a repository whose `.git/config` sets `core.fsmonitor` to a
+script that logs each time it runs. In an untrusted copy it ran from:
+
+- opening any file: gitsigns' own `plugin/gitsigns.lua` calls `setup()`
+  with defaults when the plugin loads, which attaches to the buffer already
+  open (`git ls-files`, `git check-attr`) before the config's `on_attach`
+  gate is asked. The gate refused after git had run.
+- `<leader>e`: the explorer's git status.
+- `<leader>gg`, `<leader>gG`: lazygit.
+- `<leader>gB`, `<leader>gY`: git browse.
+- `<leader>fg`, `<leader>gD`, `<leader>gS`: LazyVim's git-files, diff and
+  stash pickers.
+- saving a file: gitsigns again.
+
+gitsigns now loads at startup, before any file is read, with `auto_attach`
+off, and is attached to a buffer only when `util.git.allowed` says so. A
+`DotfilesGitPermissionChanged` event (fired when trust changes) attaches or
+detaches every loaded buffer, so trusting a project needs no reload. The
+explorer turns its git status off where git is not allowed. Every git key
+goes through `util.git.guard`. After the change the canary logged nothing
+across startup, the explorer, lazygit, git browse, the git pickers, saving,
+the worktree picker and session restore. Once the project was trusted it
+logged again for gitsigns, the explorer and lazygit.
+
+`git rev-parse` for the branch in the cwd still runs at gitsigns' setup. It
+reads no index, so `core.fsmonitor` is not asked.
+
+## 91. git runs without trust where the repository names no programs
+
+What makes git dangerous in a directory you did not create is the
+repository's own config and hooks: settings whose value git executes, or
+that pick the program it runs. If `.git/config` (and, for a linked worktree,
+the shared config and `config.worktree`) holds only settings that cannot do
+that, and there is no hook, git is allowed without asking. It is re-read on
+every check, so a setting added later is seen at once. Project programs (a
+virtualenv's, `node_modules/.bin`) still need trust, and `git_project = false`
+still wins.
+
+The config is read with `git config --file <file> --no-includes --list`,
+which reads one file and runs nothing it names. An include is not followed;
+`include.path` itself counts as naming something, since what it pulls in
+was not read. A file git cannot parse counts as naming something.
+
+The allowlist is the settings git writes on its own (`init`, `clone`,
+`submodule`, `worktree`), remotes, branches and submodule URLs, identity and
+signing format, rerere, pull/push/fetch defaults, and what `gh`, `glab`,
+`git-lfs` and `git-secrets` write. Everything else is treated as naming a
+program, including keys that are only data, because an unknown key is the
+case to be careful about. Borderline keys:
+
+- `remote.*.url` is allowed. An `ext::` URL would run a command on fetch,
+  but git refuses the `ext` transport unless `protocol.ext.allow` says
+  otherwise, and `protocol.*` is not on the list.
+- `remote.*.uploadpack`, `remote.*.receivepack` and `remote.*.vcs` are not:
+  each names a program git starts for a local or helper transport.
+- `submodule.*.update` is not: `!command` runs a command.
+- `secrets.providers` is allowed although git-secrets runs it, because only
+  git-secrets runs it, and git-secrets only runs from a hook or by hand. A
+  hook already makes the repository need trust.
+- `gpg.format` is allowed; `gpg.program` and `gpg.*.program` are not. The
+  format only picks between programs your own config or PATH supplies.
+- `core.hooksPath`, `core.fsmonitor`, `core.pager`, `core.editor`,
+  `core.sshCommand`, `core.askPass`, `diff.*`, `filter.*`, `merge.*`,
+  `credential.*`, `alias.*`, `pager.*`, `url.*`, `include*` are not.
+
+The prompt on opening a project now appears only when there is something to
+trust: a program directory, or git settings and hooks that name programs.
+
+## 92. The trust menu shows what trusting runs
+
+"Show what trusting this project runs" opens a list, built from file reads
+and the `git config --file` read above, never by running anything from the
+project:
+
+- each program directory: every executable, where a symlink leads and
+  whether that is outside the project, its `#!` line or that it is a binary,
+  the interpreter a virtualenv was made from, and for `node_modules/.bin` the
+  package and version and what the lockfile says about it.
+- every git setting not on the allowlist, with the file it is in, and every
+  hook with its first line.
+- the files that steer the agent: `CLAUDE.md`, `CLAUDE.local.md`,
+  `.claude/CLAUDE.md`, `.claude/settings*.json`, `.claude/rules/*.md`,
+  `AGENTS.md`.
+
+## 93. Language servers given an untrusted project
+
+Checked with the same kind of canaries, against the servers this
+configuration starts from PATH or Mason:
+
+- lua_ls with a `.luarc.json` naming a `runtime.plugin` that writes a file:
+  not run. LuaLS asks through `window/showMessageRequest` before loading a
+  plugin unless the client sets `trustByClient`, which nothing here does.
+- ty and ruff with a `.venv/bin/python` that logs when run: not run. ty
+  reads `pyvenv.cfg` rather than asking the interpreter.
+- pylsp and pyrefly are not on PATH or in Mason here, so they could only come
+  from the project, which needs trust.
+- No TypeScript server attached in the fixture, so a project's own
+  `node_modules/typescript` could not be loaded.
+
+Not covered: neoconf applies a project's `.neoconf.json` and
+`.vscode/settings.json` to language server settings without asking.
