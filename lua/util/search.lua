@@ -346,7 +346,9 @@ end
 ---@param item table
 ---@return string|nil path, integer|nil line
 local function item_location(item)
-  return item.file, item.pos and item.pos[1] or item.lnum
+  local relative_to_cwd = item.file and item.cwd and vim.fn.isabsolutepath(item.file) == 0
+  local path = relative_to_cwd and vim.fs.joinpath(item.cwd, item.file) or item.file
+  return path, item.pos and item.pos[1] or item.lnum
 end
 
 ---@param item table
@@ -487,11 +489,13 @@ function Ranking:drain(picker)
 end
 
 ---@param name? string
+---@param cwd? string
 ---@return table
-function M.opts(name)
+function M.opts(name, cwd)
   local preset = M.preset(name or require("util.settings").get("search_preset")) or M.presets()[1]
   local ranking = Ranking.new()
   return {
+    cwd = cwd,
     args = preset.args,
     search_preset = preset.name,
     title = "Grep (" .. preset.name .. ")",
