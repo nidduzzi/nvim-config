@@ -181,6 +181,20 @@ describe("ranking grep results by definition", function()
     assert.equal(0, picker.finds)
   end)
 
+  it("ranks results of a search run from another directory than the editor's", function()
+    local absolute = write("auth.lua", { "local function issueToken() end" })
+    local relative_definition = { cwd = directory, file = "auth.lua", pos = { 1, 0 } }
+    local absolute_definition = { cwd = vim.fn.tempname(), file = absolute, pos = { 1, 0 } }
+    local picker = fake_picker({ relative_definition, absolute_definition }, "issueToken")
+    local ranking = search.Ranking.new({ delay_ms = 0 })
+
+    rank_all(ranking, picker, "issueToken")
+    wait_for_drain(ranking)
+
+    assert.equal(search.DEFINITION_SCORE_MUL, relative_definition.score_mul)
+    assert.equal(search.DEFINITION_SCORE_MUL, absolute_definition.score_mul)
+  end)
+
   it("does not re-rank when parsing changed nothing", function()
     local path = write("notes.txt", { "issueToken" })
     local picker = fake_picker({ { file = path, pos = { 1, 0 } } }, "issueToken")

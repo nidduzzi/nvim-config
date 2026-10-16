@@ -86,16 +86,17 @@ for key, git_action in pairs({
     end,
   },
   ["<leader>gg"] = {
-    desc = "Lazygit (root dir)",
-    root = LazyVim.root.git,
+    desc = "Lazygit (cwd)",
+    root = vim.fn.getcwd,
     run = function()
-      Snacks.lazygit({ cwd = LazyVim.root.git() })
+      Snacks.lazygit({ cwd = vim.fn.getcwd() })
     end,
   },
   ["<leader>gG"] = {
-    desc = "Lazygit (cwd)",
+    desc = "Lazygit (project root)",
+    root = LazyVim.root.git,
     run = function()
-      Snacks.lazygit()
+      Snacks.lazygit({ cwd = LazyVim.root.git() })
     end,
   },
   ["<leader>gB"] = {
@@ -124,6 +125,20 @@ for key, git_action in pairs({
     require("util.git").guard(git_action.run, git_action.root and git_action.root())
   end, { desc = git_action.desc })
 end
+
+map("n", "<leader>ft", function()
+  Snacks.terminal(nil, { cwd = vim.fn.getcwd() })
+end, { desc = "Terminal (cwd)" })
+
+map("n", "<leader>fT", function()
+  Snacks.terminal(nil, { cwd = LazyVim.root() })
+end, { desc = "Terminal (project root)" })
+
+local function focus_terminal_in_cwd()
+  Snacks.terminal.focus(nil, { cwd = vim.fn.getcwd() })
+end
+map({ "n", "t" }, "<c-/>", focus_terminal_in_cwd, { desc = "Terminal (cwd)" })
+map({ "n", "t" }, "<c-_>", focus_terminal_in_cwd, { desc = "which_key_ignore" })
 
 -- Watch the keys this config depends on. Something taking one of these means a
 -- feature quietly stopped existing, which is worth hearing about when it
