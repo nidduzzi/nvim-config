@@ -147,19 +147,21 @@ return {
         function()
           Snacks.picker.grep(search.opts("code"))
         end,
-        desc = "Grep (no docs)",
+        desc = "Grep (cwd, no docs)",
       },
       {
-        -- One grep, not three. Which files it searches is a decision made
-        -- while reading the results, not before opening the picker, so the
-        -- filter is a key inside it: <a-s> cycles code, everything and
-        -- documentation, <a-S> picks from the list. Three keys on a prefix
-        -- that already holds thirty-five bought nothing that <a-s> did not.
         "<leader>sg",
         function()
           Snacks.picker.grep(search.opts("code"))
         end,
-        desc = "Grep (a-s cycles the scope)",
+        desc = "Grep (cwd, a-s cycles the filter)",
+      },
+      {
+        "<leader>sG",
+        function()
+          Snacks.picker.grep(search.opts("code", LazyVim.root()))
+        end,
+        desc = "Grep (project root, a-s cycles the filter)",
       },
       {
         "<leader>sw",
@@ -167,8 +169,46 @@ return {
           Snacks.picker.grep_word(search.opts("code"))
         end,
         mode = { "n", "x" },
-        desc = "Grep word under cursor (no docs)",
+        desc = "Grep word (cwd)",
       },
+      {
+        "<leader>sW",
+        function()
+          Snacks.picker.grep_word(search.opts("code", LazyVim.root()))
+        end,
+        mode = { "n", "x" },
+        desc = "Grep word (project root)",
+      },
+      {
+        "<leader>ff",
+        function()
+          Snacks.picker.files()
+        end,
+        desc = "Find files (cwd)",
+      },
+      {
+        "<leader>fF",
+        function()
+          Snacks.picker.files({ cwd = LazyVim.root() })
+        end,
+        desc = "Find files (project root)",
+      },
+      {
+        "<leader>fe",
+        function()
+          Snacks.explorer()
+        end,
+        desc = "Explorer (cwd)",
+      },
+      {
+        "<leader>fE",
+        function()
+          Snacks.explorer({ cwd = LazyVim.root() })
+        end,
+        desc = "Explorer (project root)",
+      },
+      { "<leader>e", "<leader>fe", desc = "Explorer (cwd)", remap = true },
+      { "<leader>E", "<leader>fE", desc = "Explorer (project root)", remap = true },
     },
   },
 

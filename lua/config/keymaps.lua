@@ -45,6 +45,34 @@ for key, picker in pairs({
   end, { desc = "Git: " .. picker:gsub("_", " ") })
 end
 
+map("n", "<leader>gg", function()
+  local cwd = vim.fn.getcwd()
+  require("util.git").guard(function()
+    Snacks.lazygit({ cwd = cwd })
+  end, cwd)
+end, { desc = "Lazygit (cwd)" })
+
+map("n", "<leader>gG", function()
+  local project_root = LazyVim.root.git()
+  require("util.git").guard(function()
+    Snacks.lazygit({ cwd = project_root })
+  end, project_root)
+end, { desc = "Lazygit (project root)" })
+
+map("n", "<leader>ft", function()
+  Snacks.terminal(nil, { cwd = vim.fn.getcwd() })
+end, { desc = "Terminal (cwd)" })
+
+map("n", "<leader>fT", function()
+  Snacks.terminal(nil, { cwd = LazyVim.root() })
+end, { desc = "Terminal (project root)" })
+
+local function focus_terminal_in_cwd()
+  Snacks.terminal.focus(nil, { cwd = vim.fn.getcwd() })
+end
+map({ "n", "t" }, "<c-/>", focus_terminal_in_cwd, { desc = "Terminal (cwd)" })
+map({ "n", "t" }, "<c-_>", focus_terminal_in_cwd, { desc = "which_key_ignore" })
+
 -- Watch the keys this config depends on. Something taking one of these means a
 -- feature quietly stopped existing, which is worth hearing about when it
 -- happens rather than when it is next needed.
