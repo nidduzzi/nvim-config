@@ -2323,3 +2323,25 @@ too. One `<Esc>` still reaches the program. `<a-q>` and `<C-\><C-n>` also
 leave it.
 
 `s` stays flash jump. Vim's `s` is `cl` and `S` is `cc`.
+
+## 86. The managed Python goes first only while Mason installs
+
+Mason makes a Python package's virtualenv with the `python3` on PATH, and this
+machine's system `python3` has no `ensurepip`. So `util.python` used to put a
+managed interpreter (mise or uv) ahead of it on PATH, at startup, for the
+editor's whole life. Everything Neovim started inherited that PATH. lazygit's
+pre-commit hooks ran the managed `python3`, which lacks the system Python's
+packages, and migml's hooks failed with an import error for `yaml`. A shell
+in a Neovim terminal re-runs `.bashrc` and rebuilds PATH, which is why the
+same commit worked there.
+
+The managed interpreter is now first only while a Mason install runs: put in
+front when the first install starts, taken out when the last one closes.
+Checked with a real `yamllint` install: `python3` was the system one before,
+the managed one during, the system one after, and the new venv was made from
+the managed interpreter.
+
+Where to look is each version manager's default install directory, or the
+one its own variable names: `MISE_DATA_DIR`, `UV_PYTHON_INSTALL_DIR`,
+`PYENV_ROOT`, `ASDF_DATA_DIR`, with `XDG_DATA_HOME` for the defaults that
+live under it. Nothing about one machine's layout is written down.
