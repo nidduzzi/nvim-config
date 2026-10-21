@@ -74,7 +74,6 @@ function M.open(root)
   local git = require("util.git")
   local private = require("util.private")
 
-
   local trusted = trust.is_trusted(root)
   local where = vim.fn.fnamemodify(root, ":~")
 

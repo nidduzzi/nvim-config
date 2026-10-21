@@ -8,11 +8,15 @@ local function write(root, relative, lines)
 end
 
 local symlinks_and_shebangs_work_here = vim.fn.has("win32") == 0
-if not symlinks_and_shebangs_work_here then
-  return
-end
 
 describe("showing what trusting a project runs", function()
+  if not symlinks_and_shebangs_work_here then
+    it("needs symlinks and shebangs, which Windows does not have", function()
+      MiniTest.skip("no symlinks or shebangs here")
+    end)
+    return
+  end
+
   local root
   local canary
 
@@ -74,9 +78,12 @@ describe("showing what trusting a project runs", function()
 
   it("lists the git settings and hooks that name programs, and skips samples", function()
     local collected = report.collect(root)
-    assert.are.same({ "core.fsmonitor" }, vim.tbl_map(function(entry)
-      return entry.key
-    end, collected.git.entries))
+    assert.are.same(
+      { "core.fsmonitor" },
+      vim.tbl_map(function(entry)
+        return entry.key
+      end, collected.git.entries)
+    )
     assert.equal(1, #collected.git.hooks)
     assert.is_truthy(collected.git.hooks[1]:match("pre%-commit$"))
   end)
@@ -98,7 +105,7 @@ describe("showing what trusting a project runs", function()
     write(root, "yarn.lock", {
       "# yarn lockfile v1",
       "",
-      'prettier@^3.0.0:',
+      "prettier@^3.0.0:",
       '  version "3.3.3"',
       '  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.3.3.tgz"',
     })
