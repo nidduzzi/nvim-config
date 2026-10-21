@@ -377,7 +377,7 @@ function M.add(branch, opts)
   end
 
   require("util.trust").allow(path)
-  require("util.git").forget()
+  require("util.git").notify_permission_changed()
 
   vim.notify(("%s\n%s"):format(branch, vim.fn.fnamemodify(path, ":~")), vim.log.levels.INFO, {
     title = "Worktree created",
@@ -442,7 +442,7 @@ function M.remove(tree, opts)
     return false, stderr ~= "" and stderr or "git worktree remove failed"
   end
   require("util.trust").revoke(tree.path)
-  require("util.git").forget()
+  require("util.git").notify_permission_changed()
   return true
 end
 

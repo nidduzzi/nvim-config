@@ -92,6 +92,54 @@ return {
     opts = {},
   },
 
+  {
+    "lewis6991/gitsigns.nvim",
+    optional = true,
+    lazy = false,
+    opts = {
+      auto_attach = false,
+    },
+    config = function(_, opts)
+      local gitsigns = require("gitsigns")
+      local git = require("util.git")
+      gitsigns.setup(opts)
+
+      local function apply_git_permission(bufnr)
+        local name = vim.api.nvim_buf_get_name(bufnr)
+        if name == "" or vim.bo[bufnr].buftype ~= "" then
+          return
+        end
+        if git.allowed(vim.fs.dirname(name)) then
+          gitsigns.attach(bufnr)
+        else
+          gitsigns.detach(bufnr)
+        end
+      end
+
+      local function apply_git_permission_to_loaded_buffers()
+        for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+          if vim.api.nvim_buf_is_loaded(bufnr) then
+            apply_git_permission(bufnr)
+          end
+        end
+      end
+
+      local group = vim.api.nvim_create_augroup("dotfiles_gitsigns_when_allowed", { clear = true })
+      vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufWritePost", "BufFilePost" }, {
+        group = group,
+        callback = function(event)
+          apply_git_permission(event.buf)
+        end,
+      })
+      vim.api.nvim_create_autocmd("User", {
+        group = group,
+        pattern = git.permission_changed_event,
+        callback = apply_git_permission_to_loaded_buffers,
+      })
+      apply_git_permission_to_loaded_buffers()
+    end,
+  },
+
   -- Side-by-side diffs, file history, and the three-way view used to resolve
   -- merge conflicts.
   --
@@ -103,35 +151,6 @@ return {
   -- same reason. Upstream has not been pushed since 2024-08 and its "is this
   -- repo active?" issue is unanswered; and the fork ships `:DiffviewToggle`,
   -- which is exactly the open-outside-close-inside behaviour this configuration
-  -- git runs programs a repository names in its own .git/config, so gitsigns
-  -- does not attach to a project that has not been trusted: no signs, no hunk
-  -- preview, no blame, and one message saying why. See util/git.lua and
-  -- DECISIONS 44.
-  {
-    "lewis6991/gitsigns.nvim",
-    optional = true,
-    opts = function(_, opts)
-      local theirs = opts.on_attach
-
-      opts.on_attach = function(bufnr)
-        local git = require("util.git")
-        local name = vim.api.nvim_buf_get_name(bufnr)
-        local root = name ~= "" and vim.fs.dirname(name) or nil
-
-        if not git.allowed(root) then
-          git.say_refused(root)
-          return false
-        end
-
-        if theirs then
-          return theirs(bufnr)
-        end
-      end
-
-      return opts
-    end,
-  },
-
   -- had written by hand. The module path is unchanged, so `require("diffview")`
   -- and every action name still resolve.
   {
