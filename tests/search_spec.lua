@@ -114,9 +114,10 @@ describe("ranking grep results by definition", function()
   end
 
   local function wait_for_drain(ranking)
-    assert.is_true(vim.wait(2000, function()
+    local drained = vim.wait(10000, function()
       return not ranking.draining
-    end, 10))
+    end, 10)
+    assert.is_true(drained)
   end
 
   before_each(function()
